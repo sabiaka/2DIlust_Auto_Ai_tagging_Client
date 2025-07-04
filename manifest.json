@@ -1,0 +1,15 @@
+{
+    "id": "933e9248-5a1b-40d9-8cac-f07dd8a3e3fa",
+    "version": "1.0.0",
+    "platform": "all",
+    "arch": "all",
+    "name": "2Dillust Auto Ai tagger",
+    "logo": "logo.png",
+    "keywords": [],
+    "devTools": false,
+    "main": {
+        "url": "index.html",
+        "width": 640,
+        "height": 480
+    }
+}

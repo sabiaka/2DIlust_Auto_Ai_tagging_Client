@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>AIタグ付けログ</title>
+    <style>
+        /* CSSは今のままでOK！ */
+        body {
+            font-family: sans-serif;
+            background-color: #282c34;
+            color: #abb2bf;
+            margin: 0;
+            padding: 10px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        #log-container {
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .log-entry {
+            padding: 5px 8px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            white-space: pre-wrap;
+        }
+
+        .log-success {
+            /* レベル名とクラス名を合わせる */
+            background-color: #314d4a;
+            color: #98c379;
+        }
+
+        .log-info {
+            background-color: #2f4b7c;
+            color: #61afef;
+        }
+
+        .log-warn {
+            background-color: #5c4b3c;
+            color: #e5c07b;
+        }
+
+        .log-error {
+            background-color: #5c3b40;
+            color: #e06c75;
+        }
+
+        #tag-button {
+            display: block;
+            /* ボタンを横幅いっぱいに広げる */
+            width: 100%;
+            padding: 12px 15px;
+            /* 内側の余白 */
+            font-size: 16px;
+            /* 文字をちょっと大きく */
+            font-weight: bold;
+            /* 文字を太く */
+            color: #ffffff;
+            /* 文字の色を白に */
+            background-color: #0d6efd;
+            /* ちょっと目立つ青色に */
+            border: none;
+            /* 枠線なし */
+            border-radius: 5px;
+            /* 角を丸く */
+            cursor: pointer;
+            /* マウスカーソルを指の形に */
+            text-align: center;
+            /* 文字を中央揃え */
+            transition: all 0.2s ease;
+            /* ホバー時のアニメーションをなめらかに */
+            margin-bottom: 15px;
+            /* ボタンと区切り線の間に余白 */
+        }
+
+        /* マウスが乗ったときのスタイル */
+        #tag-button:hover {
+            background-color: #0b5ed7;
+            /* ちょっと濃い青に */
+        }
+
+        /* クリックした瞬間のスタイル */
+        #tag-button:active {
+            transform: scale(0.98);
+            /* ちょい小さくして押した感を出す */
+            opacity: 0.9;
+            /* ちょい薄くする */
+        }
+    </style>
+</head>
+
+<body>
+    <button id="tag-button">選択した画像にAIタグ付けを実行</button>
+
+    <hr>
+    <div id="log-container">ここにログが表示されます</div>
+
+    <script>
+        const logContainer = document.getElementById('log-container');
+        window.appendToLog = (message, level = 'info') => {
+            if (!logContainer) return;
+            if (logContainer.innerHTML === 'ここにログが表示されます') {
+                logContainer.innerHTML = '';
+            }
+            const logEntry = document.createElement('div');
+            logEntry.classList.add('log-entry', `log-${level}`);
+            logEntry.textContent = message;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        };
+    </script>
+
+    <script src="./js/plugin.js"></script>
+</body>
+
+</html>
