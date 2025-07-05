@@ -1,7 +1,7 @@
 # 2Dillust Auto AI Tagger
 
 Eagle用の2次元イラスト専用のAI自動タグ付け拡張機能です。選択した画像に対してAIを使用して自動的にタグを生成します。
-使用するには[2DIlust_Auto_Ai_tagging_APIServer](2DIlust_Auto_Ai_tagging_APIServer)が必要です。
+使用するには[2DIlust_Auto_Ai_tagging_APIServer](https://github.com/sabiaka/2DIlust_Auto_Ai_tagging_APIServer)が必要です。
 
 ## 機能
 
@@ -68,7 +68,7 @@ npm install
 
 ### `connect ECONNREFUSED 127.0.0.1:8000`と出る場合。
 
-1. [ローカルサーバ](2DIlust_Auto_Ai_tagging_APIServer)が正しくセットアップできていることを確認。
+1. [ローカルサーバ](https://github.com/sabiaka/2DIlust_Auto_Ai_tagging_APIServer)が正しくセットアップできていることを確認。
 
 
 ## バージョン
