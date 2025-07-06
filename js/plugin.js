@@ -42,11 +42,13 @@ async function runAiTagging() {
                 }
 
                 const form = new FormData();
-                
+
                 // ★★★ ファイルの種類(Content-Type)をちゃんと教える ★★★
                 const ext = item.ext.toLowerCase();
                 let contentType = 'application/octet-stream'; // デフォルト
-                if (ext === 'jpg' || ext === 'jpeg') {
+
+                // ↓↓↓ この行に`.jfif`を追加するだけ！ ↓↓↓
+                if (ext === 'jpg' || ext === 'jpeg' || ext === 'jfif') {
                     contentType = 'image/jpeg';
                 } else if (ext === 'png') {
                     contentType = 'image/png';
