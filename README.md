@@ -1,4 +1,4 @@
-# 2Dillust Auto AI Tagger
+# 2DIlust_Auto_Ai_tagging_Client
 
 Eagle用の2次元イラスト専用のAI自動タグ付け拡張機能です。選択した画像に対してAIを使用して自動的にタグを生成します。
 使用するには[2DIlust_Auto_Ai_tagging_APIServer](https://github.com/sabiaka/2DIlust_Auto_Ai_tagging_APIServer)が必要です。
@@ -28,7 +28,7 @@ npm install
 
 ## 使用方法
 1. [サーバ側](https://github.com/sabiaka/2DIlust_Auto_Ai_tagging_APIServer)のセットアップを済ませます。
-1. [P]キーを押し、`2Dilust Auto Ai tagger`を選択 (開発のタブにあると思います)
+1. [P]キーを押し、`2DIlust_Auto_Ai_tagging_Client`を選択 (開発のタブにあると思います)
 1. Eagleで画像を選択
 2. 拡張機能パネルで「選択した画像にAIタグ付けを実行」ボタンをクリック
 3. 処理の進行状況がログに表示されます
@@ -37,7 +37,7 @@ npm install
 ## ファイル構成
 
 ```
-2Dillust Auto Ai tagger/
+2DIlust_Auto_Ai_tagging_Client/
 ├── index.html          # メインUI
 ├── main.js            # 拡張機能のエントリーポイント
 ├── js/
