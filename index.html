@@ -14,11 +14,15 @@
             padding: 10px;
             font-size: 14px;
             box-sizing: border-box;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
         #log-container {
-            height: 100vh;
+            flex: 1 1 auto;
             overflow-y: auto;
+            min-height: 0;
         }
 
         .log-entry {
@@ -90,13 +94,45 @@
             opacity: 0.9;
             /* ちょい薄くする */
         }
+
+        #clear-log-button {
+            display: block;
+            width: 100%;
+            padding: 8px 15px;
+            font-size: 14px;
+            color: #abb2bf;
+            background-color: #23272e;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            margin-bottom: 10px;
+            margin-top: -5px;
+            opacity: 0.7;
+            transition: all 0.2s ease;
+        }
+        #clear-log-button:hover {
+            background-color: #2c313a;
+            opacity: 1;
+        }
+
+        #button-bar {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: #282c34;
+            padding-bottom: 5px;
+            /* 下のhrと区切りがつくように */
+        }
     </style>
 </head>
 
 <body>
-    <button id="tag-button">選択した画像にAIタグ付けを実行</button>
-
-    <hr>
+    <div id="button-bar">
+        <button id="tag-button">選択した画像にAIタグ付けを実行</button>
+        <button id="clear-log-button">ログをクリア</button>
+    </div>
+    
     <div id="log-container">ここにログが表示されます</div>
 
     <script>
@@ -112,6 +148,12 @@
             logContainer.appendChild(logEntry);
             logContainer.scrollTop = logContainer.scrollHeight;
         };
+
+        // クリアボタンの処理
+        const clearLogButton = document.getElementById('clear-log-button');
+        clearLogButton.addEventListener('click', () => {
+            logContainer.innerHTML = 'ここにログが表示されます';
+        });
     </script>
 
     <script src="./js/plugin.js"></script>

@@ -58,6 +58,8 @@ async function runAiTagging() {
                     contentType = 'image/bmp';
                 } else if (ext === 'webp') {
                     contentType = 'image/webp';
+                } else if (ext === 'psd') {
+                    contentType = 'image/psd';
                 }
 
                 // FormDataに追加するときに、ファイル名とContent-Typeを指定する
