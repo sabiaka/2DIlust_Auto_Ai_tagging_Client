@@ -32,8 +32,19 @@ async function runAiTagging() {
         }
         log(`タグ付けスタート！対象は ${items.length} 件だよ✨`, 'info');
 
+        // プログレスバー要素取得
+        const progressBarContainer = window.parent?.document?.getElementById('progress-bar-container') || document.getElementById('progress-bar-container');
+        const progressBar = window.parent?.document?.getElementById('progress-bar') || document.getElementById('progress-bar');
+        const progressText = window.parent?.document?.getElementById('progress-text') || document.getElementById('progress-text');
+        if (progressBarContainer && progressBar && progressText) {
+            progressBarContainer.style.display = '';
+            progressBar.style.width = '0%';
+            progressText.textContent = '';
+        }
+
         // 選択された画像を1枚ずつ処理する
-        for (const item of items) {
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
             try {
                 const fileBuffer = fs.readFileSync(item.filePath);
                 if (fileBuffer.length === 0) {
@@ -124,6 +135,19 @@ async function runAiTagging() {
                     previewImage.src = item.filePath.startsWith('http') ? item.filePath : 'file://' + item.filePath;
                     previewContainer.style.display = '';
                 }
+
+                // プログレスバー更新
+                if (progressBar && progressText) {
+                    const done = i + 1;
+                    const total = items.length;
+                    const percent = Math.round((done / total) * 100);
+                    progressBar.style.width = percent + '%';
+                    progressText.textContent = `${done} / ${total}  ${percent}%`;
+                    console.log(`[progress] done=${done}, total=${total}, percent=${percent}, barWidth=${progressBar.style.width}, text='${progressText.textContent}'`);
+                }
+
+                // UI更新のためにイベントループをyield
+                await new Promise(r => setTimeout(r, 0));
             } catch (err) {
                 log(`[${item.name}] のタグ付けでエラー発生...🥺`, 'error', item.filePath);
                 if (err.response && err.response.data) {
@@ -136,9 +160,14 @@ async function runAiTagging() {
         }
         log('ぜんぶ終わったよ！おつかれ！💖', 'info');
 
-        // 全て終わったらプレビュー非表示
+        // 全て終わったらプレビュー非表示＆プログレスバー非表示
         const previewContainer = window.parent?.document?.getElementById('preview-container') || document.getElementById('preview-container');
         if (previewContainer) previewContainer.style.display = 'none';
+        if (progressBarContainer && progressBar && progressText) {
+            progressBar.style.width = '100%';
+            progressText.textContent = `${items.length} / ${items.length}  100%`;
+            setTimeout(() => { progressBarContainer.style.display = 'none'; }, 500);
+        }
     } catch (err) {
         log(`予期せぬ大エラーが発生しました: ${err.message}`, 'error');
     }
