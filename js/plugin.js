@@ -13,17 +13,44 @@ const API_PATH = '/tag';
 
 // --- メインの処理 ---
 
+// タグ付け実行・キャンセル制御用フラグ
+let isTagging = false;
+let cancelTagging = false;
+
+// ボタン状態切り替え
+function updateTagButton(running) {
+    const tagButton = document.getElementById('tag-button');
+    if (!tagButton) return;
+    if (running) {
+        tagButton.textContent = 'タグ付け中止';
+        tagButton.classList.add('tagging');
+    } else {
+        tagButton.textContent = '選択した画像にAIタグ付けを実行';
+        tagButton.classList.remove('tagging');
+    }
+}
+
 // HTMLの準備ができたら、ボタンにクリックイベントをセットする
 window.addEventListener('DOMContentLoaded', () => {
     const tagButton = document.getElementById('tag-button');
     tagButton.addEventListener('click', () => {
-        runAiTagging();
+        if (isTagging) {
+            cancelTagging = true;
+            log('キャンセル要求を受け付けました...', 'warn');
+        } else {
+            runAiTagging();
+        }
     });
+    updateTagButton(false);
     log('準備完了！ボタンを押してね！', 'success');
 });
 
 // AIタグ付けを実行するメイン関数
 async function runAiTagging() {
+    if (isTagging) return;
+    isTagging = true;
+    cancelTagging = false;
+    updateTagButton(true);
     try {
         const items = await eagle.item.getSelected();
         if (items.length === 0) {
@@ -44,6 +71,10 @@ async function runAiTagging() {
 
         // 選択された画像を1枚ずつ処理する
         for (let i = 0; i < items.length; i++) {
+            if (cancelTagging) {
+                log('タグ付け処理を中止しました。', 'warn');
+                break;
+            }
             const item = items[i];
             try {
                 const fileBuffer = fs.readFileSync(item.filePath);
@@ -158,7 +189,9 @@ async function runAiTagging() {
                 }
             }
         }
-        log('ぜんぶ終わったよ！おつかれ！💖', 'info');
+        if (!cancelTagging) {
+            log('ぜんぶ終わったよ！おつかれ！💖', 'info');
+        }
 
         // 全て終わったらプレビュー非表示＆プログレスバー非表示
         const previewContainer = window.parent?.document?.getElementById('preview-container') || document.getElementById('preview-container');
@@ -171,6 +204,9 @@ async function runAiTagging() {
     } catch (err) {
         log(`予期せぬ大エラーが発生しました: ${err.message}`, 'error');
     }
+    isTagging = false;
+    updateTagButton(false);
+    cancelTagging = false;
 }
 
 // ログをUIに表示するためのヘルパー関数
