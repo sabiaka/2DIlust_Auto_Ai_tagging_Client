@@ -37,7 +37,14 @@ async function runAiTagging() {
             try {
                 const fileBuffer = fs.readFileSync(item.filePath);
                 if (fileBuffer.length === 0) {
-                    log(`[${item.name}] はファイルが空なのでスキップします。`, 'warn');
+                    // サムネイル用画像パス
+                    let thumbPath = '';
+                    if (item.filePath) {
+                        thumbPath = item.filePath.startsWith('http') ? item.filePath : 'file://' + item.filePath;
+                    } else if (item.url) {
+                        thumbPath = item.url;
+                    }
+                    log(`[${item.name}] はファイルが空なのでスキップします。`, 'warn', thumbPath);
                     continue;
                 }
 
@@ -104,29 +111,42 @@ async function runAiTagging() {
                     const newTags = [...new Set([...item.tags, ...tags])];
                     item.tags = newTags;
                     await item.save();
-                    log(`[${item.name}] にタグ [${tags.join(', ')}] を追加したお！🎉`, 'success');
+                    log(`[${item.name}] にタグ [${tags.join(', ')}] を追加したお！🎉`, 'success', item.filePath);
                 } else {
-                    log(`[${item.name}] は新しいタグがなかったよ`, 'warn');
+                    log(`[${item.name}] は新しいタグがなかったよ`, 'warn', item.filePath);
+                }
+
+                // プレビュー表示
+                const previewContainer = window.parent?.document?.getElementById('preview-container') || document.getElementById('preview-container');
+                const previewImage = window.parent?.document?.getElementById('preview-image') || document.getElementById('preview-image');
+                if (previewContainer && previewImage) {
+                    // file:// で表示できる場合はfilePathをsrcに
+                    previewImage.src = item.filePath.startsWith('http') ? item.filePath : 'file://' + item.filePath;
+                    previewContainer.style.display = '';
                 }
             } catch (err) {
-                log(`[${item.name}] のタグ付けでエラー発生...🥺`, 'error');
+                log(`[${item.name}] のタグ付けでエラー発生...🥺`, 'error', item.filePath);
                 if (err.response && err.response.data) {
                     const errorDetails = JSON.stringify(err.response.data, null, 2);
-                    log(`サーバーからのエラー詳細:\n${errorDetails}`, 'error');
+                    log(`サーバーからのエラー詳細:\n${errorDetails}`, 'error', item.filePath);
                 } else {
-                    log(`その他エラー: ${err.message}`, 'error');
+                    log(`その他エラー: ${err.message}`, 'error', item.filePath);
                 }
             }
         }
         log('ぜんぶ終わったよ！おつかれ！💖', 'info');
+
+        // 全て終わったらプレビュー非表示
+        const previewContainer = window.parent?.document?.getElementById('preview-container') || document.getElementById('preview-container');
+        if (previewContainer) previewContainer.style.display = 'none';
     } catch (err) {
         log(`予期せぬ大エラーが発生しました: ${err.message}`, 'error');
     }
 }
 
 // ログをUIに表示するためのヘルパー関数
-function log(message, level = 'info') {
+function log(message, level = 'info', imagePath = null) {
     if (window.appendToLog) {
-        window.appendToLog(message, level);
+        window.appendToLog(message, level, imagePath);
     }
 }

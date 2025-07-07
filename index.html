@@ -19,13 +19,23 @@
             flex-direction: column;
         }
 
-        #log-container {
-            flex: 1 1 auto;
-            overflow-y: auto;
+        #main-content {
+            display: block;
+            height: 100%;
             min-height: 0;
         }
 
+        #log-container {
+            overflow-y: auto;
+            min-height: 0;
+            width: 100%;
+        }
+
         .log-entry {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
             padding: 5px 8px;
             border-radius: 4px;
             margin-bottom: 5px;
@@ -144,6 +154,31 @@
         #toggle-autoscroll-button.autoscroll-on:hover {
             background-color: #0b5ed7;
         }
+
+        .log-msg {
+            flex: 1 1 0;
+            max-width: 80%;
+            word-break: break-all;
+        }
+        .log-img {
+            flex: 0 0 20%;
+            display: flex;
+            align-items: stretch;
+            justify-content: center;
+            min-width: 48px;
+            height: 100%;
+            padding: 8px;
+        }
+        .log-thumb {
+            max-width: 100%;
+            max-height: 100%;
+            height: 100%;
+            border-radius: 4px;
+            background: #181a1b;
+            object-fit: contain;
+            display: block;
+            margin: 4px;
+        }
     </style>
 </head>
 
@@ -156,19 +191,52 @@
         </div>
     </div>
     
-    <div id="log-container">ここにログが表示されます</div>
+    <div id="main-content">
+        <div id="log-container">ここにログが表示されます</div>
+    </div>
 
     <script>
         const logContainer = document.getElementById('log-container');
-        window.appendToLog = (message, level = 'info') => {
+        window.appendToLog = (message, level = 'info', imagePath = null) => {
             if (!logContainer) return;
             if (logContainer.innerHTML === 'ここにログが表示されます') {
                 logContainer.innerHTML = '';
             }
             const logEntry = document.createElement('div');
             logEntry.classList.add('log-entry', `log-${level}`);
-            logEntry.textContent = message;
+
+            // テキスト部
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'log-msg';
+            msgDiv.textContent = message;
+            logEntry.appendChild(msgDiv);
+
+            // 画像部
+            const imgDiv = document.createElement('div');
+            imgDiv.className = 'log-img';
+            if (imagePath) {
+                const img = document.createElement('img');
+                img.className = 'log-thumb';
+                img.src = imagePath;
+                img.alt = 'プレビュー';
+                img.onerror = () => { img.style.display = 'none'; };
+                img.onload = () => {
+                    if (window.autoScrollLog !== false) {
+                        logEntry.scrollIntoView({ behavior: 'auto', block: 'end' });
+                    }
+                };
+                imgDiv.appendChild(img);
+            }
+            logEntry.appendChild(imgDiv);
+
             logContainer.appendChild(logEntry);
+
+            // 最大100件を超えたら古いものから消す
+            const maxLogs = 100;
+            while (logContainer.children.length > maxLogs) {
+                logContainer.removeChild(logContainer.firstChild);
+            }
+
             if (window.autoScrollLog !== false) {
                 logEntry.scrollIntoView({ behavior: 'auto', block: 'end' });
             }
