@@ -57,7 +57,17 @@ async function runAiTagging() {
             log('画像・動画をせんたーく！してね！', 'warn');
             return;
         }
-        log(`タグ付けスタート！対象は ${items.length} 件だよ✨`, 'info');
+        // 動画ファイルの数をカウント
+        const videoCount = items.filter(item => {
+            const ext = item.ext.toLowerCase();
+            return ['mp4', 'mov', 'avi', 'wmv', 'mpeg', 'mpg'].includes(ext);
+        }).length;
+        
+        if (videoCount > 0) {
+            log(`タグ付けスタート！対象は ${items.length} 件（動画: ${videoCount}件）だよ✨ 動画ファイルは時間がかかる場合があります`, 'info');
+        } else {
+            log(`タグ付けスタート！対象は ${items.length} 件だよ✨`, 'info');
+        }
 
         // プログレスバー要素取得
         const progressBarContainer = window.parent?.document?.getElementById('progress-bar-container') || document.getElementById('progress-bar-container');
@@ -129,6 +139,11 @@ async function runAiTagging() {
                 // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
                 // httpモジュールを使って、サーバーにリクエストを送信する
+                const isVideo = ['mp4', 'mov', 'avi', 'wmv', 'mpeg', 'mpg'].includes(ext);
+                const timeout = isVideo ? 300000 : 60000; // 動画は5分、画像は1分
+                
+                log(`[${item.name}] の処理を開始します...${isVideo ? ' (動画ファイル - 時間がかかる場合があります)' : ''}`, 'info');
+                
                 const tags = await new Promise((resolve, reject) => {
                     const request = http.request({
                         method: 'POST',
@@ -136,6 +151,7 @@ async function runAiTagging() {
                         port: API_PORT,
                         path: API_PATH,
                         headers: form.getHeaders(),
+                        timeout: timeout, // タイムアウト設定
                     }, (response) => {
                         let responseData = '';
                         response.on('data', (chunk) => { responseData += chunk; });
@@ -154,6 +170,13 @@ async function runAiTagging() {
                             }
                         });
                     });
+                    
+                    // タイムアウト処理
+                    request.on('timeout', () => {
+                        request.destroy();
+                        reject(new Error(`タイムアウト: ${isVideo ? '動画ファイルの処理に時間がかかりすぎました' : '画像ファイルの処理に時間がかかりすぎました'} (${timeout/1000}秒)`));
+                    });
+                    
                     request.on('error', (err) => reject(err));
                     form.pipe(request);
                 });
@@ -197,7 +220,9 @@ async function runAiTagging() {
                     const total = items.length;
                     const percent = Math.round((done / total) * 100);
                     progressBar.style.width = percent + '%';
-                    progressText.textContent = `${done} / ${total}  ${percent}%`;
+                    const isVideo = ['mp4', 'mov', 'avi', 'wmv', 'mpeg', 'mpg'].includes(ext);
+                    const fileType = isVideo ? '動画' : '画像';
+                    progressText.textContent = `${done} / ${total}  ${percent}% (${fileType})`;
                     console.log(`[progress] done=${done}, total=${total}, percent=${percent}, barWidth=${progressBar.style.width}, text='${progressText.textContent}'`);
                 }
 
@@ -220,6 +245,8 @@ async function runAiTagging() {
         }
         if (!cancelTagging) {
             log('ぜんぶ終わったよ！おつかれ！💖', 'info');
+        } else {
+            log('処理がキャンセルされました。', 'warn');
         }
 
         // 全て終わったらプレビュー非表示＆プログレスバー非表示
