@@ -222,7 +222,7 @@
 
 <body>
     <div id="button-bar">
-        <button id="tag-button">選択した画像にAIタグ付けを実行</button>
+        <button id="tag-button">選択した画像・動画にAIタグ付けを実行</button>
         <div id="sub-button-row">
             <button id="clear-log-button">ログをクリア</button>
             <button id="toggle-autoscroll-button">自動スクロール: ON</button>
@@ -258,17 +258,42 @@
             const imgDiv = document.createElement('div');
             imgDiv.className = 'log-img';
             if (imagePath) {
-                const img = document.createElement('img');
-                img.className = 'log-thumb';
-                img.src = imagePath;
-                img.alt = 'プレビュー';
-                img.onerror = () => { img.style.display = 'none'; };
-                img.onload = () => {
-                    if (window.autoScrollLog !== false) {
-                        logEntry.scrollIntoView({ behavior: 'auto', block: 'end' });
-                    }
-                };
-                imgDiv.appendChild(img);
+                // 動画ファイルの場合は動画アイコンを表示
+                const isVideo = imagePath.toLowerCase().includes('.mp4') || 
+                               imagePath.toLowerCase().includes('.mov') || 
+                               imagePath.toLowerCase().includes('.avi') || 
+                               imagePath.toLowerCase().includes('.wmv') || 
+                               imagePath.toLowerCase().includes('.mpeg') || 
+                               imagePath.toLowerCase().includes('.mpg');
+                
+                if (isVideo) {
+                    // 動画アイコンを表示
+                    const videoIcon = document.createElement('div');
+                    videoIcon.className = 'log-thumb video-icon';
+                    videoIcon.innerHTML = '🎬';
+                    videoIcon.style.fontSize = '24px';
+                    videoIcon.style.display = 'flex';
+                    videoIcon.style.alignItems = 'center';
+                    videoIcon.style.justifyContent = 'center';
+                    videoIcon.style.background = '#181a1b';
+                    videoIcon.style.borderRadius = '4px';
+                    videoIcon.style.margin = '4px';
+                    videoIcon.title = '動画ファイル';
+                    imgDiv.appendChild(videoIcon);
+                } else {
+                    // 通常の画像プレビュー
+                    const img = document.createElement('img');
+                    img.className = 'log-thumb';
+                    img.src = imagePath;
+                    img.alt = 'プレビュー';
+                    img.onerror = () => { img.style.display = 'none'; };
+                    img.onload = () => {
+                        if (window.autoScrollLog !== false) {
+                            logEntry.scrollIntoView({ behavior: 'auto', block: 'end' });
+                        }
+                    };
+                    imgDiv.appendChild(img);
+                }
             }
             logEntry.appendChild(imgDiv);
 

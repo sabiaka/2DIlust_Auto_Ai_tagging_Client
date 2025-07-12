@@ -25,7 +25,7 @@ function updateTagButton(running) {
         tagButton.textContent = 'タグ付け中止';
         tagButton.classList.add('tagging');
     } else {
-        tagButton.textContent = '選択した画像にAIタグ付けを実行';
+        tagButton.textContent = '選択した画像・動画にAIタグ付けを実行';
         tagButton.classList.remove('tagging');
     }
 }
@@ -54,7 +54,7 @@ async function runAiTagging() {
     try {
         const items = await eagle.item.getSelected();
         if (items.length === 0) {
-            log('画像をせんたーく！してね！', 'warn');
+            log('画像・動画をせんたーく！してね！', 'warn');
             return;
         }
         log(`タグ付けスタート！対象は ${items.length} 件だよ✨`, 'info');
@@ -96,7 +96,7 @@ async function runAiTagging() {
                 const ext = item.ext.toLowerCase();
                 let contentType = 'application/octet-stream'; // デフォルト
 
-                // ↓↓↓ この行に`.jfif`を追加するだけ！ ↓↓↓
+                // ↓↓↓ ここに動画の判定を追加したよ！ ↓↓↓
                 if (ext === 'jpg' || ext === 'jpeg' || ext === 'jfif') {
                     contentType = 'image/jpeg';
                 } else if (ext === 'png') {
@@ -109,7 +109,17 @@ async function runAiTagging() {
                     contentType = 'image/webp';
                 } else if (ext === 'psd') {
                     contentType = 'image/vnd.adobe.photoshop';
-                }
+                } else if (ext === 'mp4') { // ★ここから追加！
+                    contentType = 'video/mp4';
+                } else if (ext === 'mov') {
+                    contentType = 'video/quicktime';
+                } else if (ext === 'avi') {
+                    contentType = 'video/x-msvideo';
+                } else if (ext === 'wmv') {
+                    contentType = 'video/x-ms-wmv';
+                } else if (ext === 'mpeg' || ext === 'mpg') {
+                    contentType = 'video/mpeg';
+                } // ★ここまで！
 
                 // FormDataに追加するときに、ファイル名とContent-Typeを指定する
                 form.append('file', fileBuffer, {
@@ -153,18 +163,32 @@ async function runAiTagging() {
                     const newTags = [...new Set([...item.tags, ...tags])];
                     item.tags = newTags;
                     await item.save();
-                    log(`[${item.name}] にタグ [${tags.join(', ')}] を追加したお！🎉`, 'success', item.filePath);
+                    const isVideo = ['mp4', 'mov', 'avi', 'wmv', 'mpeg', 'mpg'].includes(ext);
+                    if (isVideo) {
+                        log(`[${item.name}] にタグ [${tags.join(', ')}] を追加したお！🎉 (動画ファイル)`, 'success', item.filePath);
+                    } else {
+                        log(`[${item.name}] にタグ [${tags.join(', ')}] を追加したお！🎉`, 'success', item.filePath);
+                    }
                 } else {
-                    log(`[${item.name}] は新しいタグがなかったよ`, 'warn', item.filePath);
+                    const isVideo = ['mp4', 'mov', 'avi', 'wmv', 'mpeg', 'mpg'].includes(ext);
+                    if (isVideo) {
+                        log(`[${item.name}] は新しいタグがなかったよ (動画ファイル)`, 'warn', item.filePath);
+                    } else {
+                        log(`[${item.name}] は新しいタグがなかったよ`, 'warn', item.filePath);
+                    }
                 }
 
-                // プレビュー表示
+                // プレビュー表示（動画の場合は無効）
                 const previewContainer = window.parent?.document?.getElementById('preview-container') || document.getElementById('preview-container');
                 const previewImage = window.parent?.document?.getElementById('preview-image') || document.getElementById('preview-image');
                 if (previewContainer && previewImage) {
-                    // file:// で表示できる場合はfilePathをsrcに
-                    previewImage.src = item.filePath.startsWith('http') ? item.filePath : 'file://' + item.filePath;
-                    previewContainer.style.display = '';
+                    // 動画ファイルの場合はプレビューを無効にする
+                    const isVideo = ['mp4', 'mov', 'avi', 'wmv', 'mpeg', 'mpg'].includes(ext);
+                    if (!isVideo) {
+                        // file:// で表示できる場合はfilePathをsrcに
+                        previewImage.src = item.filePath.startsWith('http') ? item.filePath : 'file://' + item.filePath;
+                        previewContainer.style.display = '';
+                    }
                 }
 
                 // プログレスバー更新
@@ -180,12 +204,17 @@ async function runAiTagging() {
                 // UI更新のためにイベントループをyield
                 await new Promise(r => setTimeout(r, 0));
             } catch (err) {
-                log(`[${item.name}] のタグ付けでエラー発生...🥺`, 'error', item.filePath);
+                const isVideo = ['mp4', 'mov', 'avi', 'wmv', 'mpeg', 'mpg'].includes(ext);
+                if (isVideo) {
+                    log(`[${item.name}] のタグ付けでエラー発生...🥺 (動画ファイル)`, 'error', item.filePath);
+                } else {
+                    log(`[${item.name}] のタグ付けでエラー発生...🥺`, 'error', item.filePath);
+                }
                 if (err.response && err.response.data) {
                     const errorDetails = JSON.stringify(err.response.data, null, 2);
-                    log(`サーバーからのエラー詳細:\n${errorDetails}`, 'error', item.filePath);
+                    log(`サーバーからのエラー詳細:\n${errorDetails}`, 'error');
                 } else {
-                    log(`その他エラー: ${err.message}`, 'error', item.filePath);
+                    log(`その他エラー: ${err.message}`, 'error');
                 }
             }
         }
