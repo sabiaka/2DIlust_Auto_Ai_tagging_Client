@@ -24,9 +24,9 @@ async function run(config, expectedTransport, failure = null) {
         getHeaders() { return {'content-type':'multipart/form-data; boundary=test'}; }
         pipe(req) {
             queueMicrotask(() => {
-                const response = new EventEmitter(); response.statusCode = failure === 'http' ? 401 : 200;
+                const response = new EventEmitter(); response.statusCode = failure === 'proxy' ? 530 : failure === 'http' ? 401 : 200;
                 req.callback(response);
-                response.emit('data', JSON.stringify(failure === 'http' ? {detail:'Unauthorized'} : {tags:['タグ']})); response.emit('end');
+                response.emit('data', failure === 'proxy' ? '<html>Origin unavailable</html>' : JSON.stringify(failure === 'http' ? {detail:'Unauthorized'} : {tags:['タグ']})); response.emit('end');
             });
         }
     }
@@ -66,12 +66,14 @@ async function run(config, expectedTransport, failure = null) {
     assert.equal(captured.headers.Authorization,config.token ? 'Bearer '+config.token : undefined);
     assert.equal(saved,!failure);
     if (failure === 'http') assert.ok(logs.some(message => message.includes('Unauthorized')));
+    if (failure === 'proxy') assert.ok(logs.some(message => message.includes('HTTP 530') && message.includes('Colab')));
 }
 (async () => {
     await run({host:'example.trycloudflare.com',port:443,protocol:'https:',token:'test-token'},'https');
     await run({host:'127.0.0.1',port:8000},'http');
     await run({host:'example.trycloudflare.com',port:443,protocol:'https:',token:'test-token'},'https','http');
     await run({host:'127.0.0.1',port:8000},'http','file');
+    await run({host:'example.trycloudflare.com',port:443,protocol:'https:',token:'test-token'},'https','proxy');
     console.log('Client job selects HTTPS + bearer token; legacy HTTP still saves returned tags.');
 })().catch(error => { console.error(error); process.exitCode=1; });
 

@@ -195,6 +195,18 @@ async function runAiTagging() {
                         response.on('data', (chunk) => { responseData += chunk; });
                         response.on('end', () => {
                             try {
+                                if (response.statusCode < 200 || response.statusCode >= 300) {
+                                    const error = new Error(response.statusCode === 530
+                                        ? 'HTTP 530: 接続先のColab APIが停止している可能性があります。再起動後のURLとトークンを設定してください。'
+                                        : `HTTPエラー: ${response.statusCode}`);
+                                    try {
+                                        error.response = { data: JSON.parse(responseData) };
+                                    } catch (_) {
+                                        // Proxy errors can return HTML instead of API JSON.
+                                    }
+                                    reject(error);
+                                    return;
+                                }
                                 const jsonResponse = JSON.parse(responseData);
                                 if (response.statusCode >= 200 && response.statusCode < 300) {
                                     resolve(jsonResponse.tags);
@@ -269,9 +281,9 @@ async function runAiTagging() {
             } catch (err) {
                 const isVideo = ['mp4', 'mov', 'avi', 'wmv', 'mpeg', 'mpg'].includes(ext);
                 if (isVideo) {
-                    log(`[${item.name}] のタグ付けでエラー発生...🥺 (動画ファイル)`, 'error', item.filePath);
+                    log(`[${item.name}] のタグ付けでエラー発生: ${err.message} (動画ファイル)`, 'error', item.filePath);
                 } else {
-                    log(`[${item.name}] のタグ付けでエラー発生...🥺`, 'error', item.filePath);
+                    log(`[${item.name}] のタグ付けでエラー発生: ${err.message}`, 'error', item.filePath);
                 }
                 if (err.response && err.response.data) {
                     const errorDetails = JSON.stringify(err.response.data, null, 2);
