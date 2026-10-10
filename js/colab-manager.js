@@ -9,6 +9,18 @@ function createManager({ configPath, storage, settings, onProgress = () => {}, s
     function available() { return Boolean(findConfig()); }
     function enabled() { return available() && storage.getItem(modeKey) !== 'false'; }
     function setEnabled(value) { storage.setItem(modeKey, String(Boolean(value))); }
+    function sync() {
+        const locatedConfig = findConfig();
+        if (!locatedConfig) return null;
+        const config = JSON.parse(readFile(locatedConfig, 'utf8'));
+        if (!path.isAbsolute(config.connectionFile)) throw new Error('接続JSONの絶対パスが必要です。');
+        const connection = JSON.parse(readFile(config.connectionFile, 'utf8'));
+        const parsed = new URL(connection.url);
+        if (parsed.protocol !== 'https:' || !parsed.hostname.endsWith('.trycloudflare.com') || !connection.token) {
+            throw new Error('Colabの接続JSONが正しくありません。');
+        }
+        return settings.save(storage, connection.url, 443, connection.token);
+    }
     function ensure() {
         if (inFlight) return inFlight;
         inFlight = recover().finally(() => { inFlight = null; });
@@ -50,15 +62,11 @@ function createManager({ configPath, storage, settings, onProgress = () => {}, s
             child.on('error', () => finish(new Error('Colab自動起動を実行できません。CLIと自動接続設定を確認してください。')));
             child.on('close', code => finish(code === 0 ? null : new Error('Colabの自動復旧に失敗しました。Check-Colab-API.batで状態を確認してください。認証切れの場合はColab-Login.batを実行してください。')));
         });
-        const connection = JSON.parse(readFile(config.connectionFile, 'utf8'));
-        const parsed = new URL(connection.url);
-        if (parsed.protocol !== 'https:' || !parsed.hostname.endsWith('.trycloudflare.com') || !connection.token) {
-            throw new Error('Colabの新しい接続情報を確認できませんでした。');
-        }
-        const destination = settings.save(storage, connection.url, 443, connection.token);
+        const destination = sync();
+        if (!destination) throw new Error('Colabの新しい接続情報を確認できませんでした。');
         onProgress('Colabの接続先を自動更新しました。');
         return destination;
     }
-    return { available, enabled, setEnabled, ensure };
+    return { available, enabled, setEnabled, ensure, sync };
 }
 module.exports = { createManager };

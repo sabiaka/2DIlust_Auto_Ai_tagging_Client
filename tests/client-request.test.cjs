@@ -38,7 +38,7 @@ async function run(config, expectedTransport, failure = null, automatic = false)
     }};
     const context = vm.createContext({
         require(name) {
-            if (name.endsWith('colab-manager.js')) return {createManager:() => ({enabled:() => automatic,ensure:async () => {ensured=true;return config;}})};
+            if (name.endsWith('colab-manager.js')) return {createManager:() => ({enabled:() => automatic,sync:()=>config,ensure:async () => {ensured=true;return config;}})};
             if (name==='fs') return {readFileSync:() => {
                 if (failure === 'file') throw new Error('ENOENT test image');
                 return Buffer.from('test image');

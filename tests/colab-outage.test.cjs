@@ -6,7 +6,7 @@ async function scenario({persistent=false,recoveryFails=false,automatic=true,net
     let requests=0,recoveries=0; const uploads=[],destinations=[],saved=[],logs=[];
     const initial={host:'old.trycloudflare.com',port:443,protocol:'https:',token:'old-token'};
     const updated={...initial,host:'new.trycloudflare.com',token:'new-token'};
-    const manager={enabled:()=>automatic,ensure:async()=>{recoveries++;if(recoveryFails&&recoveries>1)throw Error('Recovery failed');return recoveries>1?updated:initial}};
+    const manager={enabled:()=>automatic,sync:()=>initial,ensure:async()=>{recoveries++;if(recoveryFails&&recoveries>1)throw Error('Recovery failed');return recoveries>1?updated:initial}};
     const transport={request(options,callback){destinations.push(options);const req=new EventEmitter();req.destroy=()=>{};req.callback=callback;return req}};
     class Form {
         append(key,bytes,options){this.filename=options.filename}

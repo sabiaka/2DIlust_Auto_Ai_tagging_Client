@@ -16,6 +16,22 @@ const colabManager = require(path.join(__dirname, 'js', 'colab-manager.js')).cre
 });
 const API_PATH = '/tag';
 
+function refreshConnectionFromJson() {
+    // Respect a manually selected LAN server. Existing Colab connections also
+    // synchronize when runtime auto-start has been switched off.
+    if (!colabManager.enabled() && !apiSettings.host.endsWith('.trycloudflare.com')) return;
+    try {
+        const updated = colabManager.sync();
+        if (updated) {
+            apiSettings = updated;
+            const current = document.getElementById('connection-current');
+            if (current) current.textContent = connectionSettings.format(apiSettings);
+        }
+    } catch (_) {
+        log('接続JSONを読み込めませんでした。現在の設定を保持します。自動復旧時に再取得します。', 'warn');
+    }
+}
+
 // --- メインの処理 ---
 
 // タグ付け実行・キャンセル制御用フラグ
@@ -37,6 +53,7 @@ function updateTagButton(running) {
 
 // HTMLの準備ができたら、ボタンにクリックイベントをセットする
 window.addEventListener('DOMContentLoaded', () => {
+    refreshConnectionFromJson();
     const dialog = document.getElementById('connection-dialog');
     const hostInput = document.getElementById('connection-host');
     const portInput = document.getElementById('connection-port');
@@ -48,6 +65,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     showConnection();
     document.getElementById('settings-button').addEventListener('click', () => {
+        refreshConnectionFromJson();
         hostInput.value = apiSettings.protocol === 'https:' ? connectionSettings.format(apiSettings) : apiSettings.host;
         portInput.value = apiSettings.port;
         tokenInput.value = apiSettings.token;
@@ -97,6 +115,7 @@ async function runAiTagging() {
     updateTagButton(true);
     // Keep one destination for the whole job; edits apply to the next run.
     try {
+        refreshConnectionFromJson();
         const items = await eagle.item.getSelected();
         if (items.length === 0) {
             log('画像・動画をせんたーく！してね！', 'warn');

@@ -30,6 +30,10 @@ const manager = createManager({
 });
 (async () => {
     assert.equal(manager.enabled(),true);
+    const synced = manager.sync();
+    assert.equal(synced.host,'fresh.trycloudflare.com');
+    assert.equal(settings.load(storage).token,'private-token');
+    assert.equal(calls,0,'Reading connection JSON does not start Colab');
     const a = manager.ensure(), b = manager.ensure();
     assert.equal(a,b,'Concurrent requests share one recovery');
     const result = await a;
@@ -54,5 +58,10 @@ const manager = createManager({
     assert.equal(shared.available(),true,'Shared configuration works outside installed plugin directory');
     shared.setEnabled(true);
     assert.equal((await shared.ensure()).host,'shared.trycloudflare.com');
+    const invalid=createManager({configPath:path.join(root,'bad-config.json'),storage,settings,exists:()=>true,
+        readFile:file=>JSON.stringify(file.endsWith('bad-config.json')?config:{url:'https://untrusted.example',token:'bad'})});
+    const preserved=settings.load(storage);
+    assert.throws(()=>invalid.sync(),/接続JSON/);
+    assert.deepEqual(settings.load(storage),preserved,'Invalid JSON connection preserves saved settings');
     console.log('Colab auto recovery: settings update, concurrency, privacy and failure checks passed.');
 })().catch(error => {console.error(error); process.exitCode=1;});
