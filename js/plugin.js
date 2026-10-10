@@ -7,8 +7,8 @@ const FormData = require('form-data');
 const http = require('http'); // axiosの代わりにhttpモジュールを使う
 
 // --- APIサーバーの設定 ---
-const API_HOST = '127.0.0.1';
-const API_PORT = 8000;
+const connectionSettings = window.aiTaggerConnectionSettings;
+let apiSettings = connectionSettings.load(localStorage);
 const API_PATH = '/tag';
 
 // --- メインの処理 ---
@@ -32,6 +32,37 @@ function updateTagButton(running) {
 
 // HTMLの準備ができたら、ボタンにクリックイベントをセットする
 window.addEventListener('DOMContentLoaded', () => {
+    const dialog = document.getElementById('connection-dialog');
+    const hostInput = document.getElementById('connection-host');
+    const portInput = document.getElementById('connection-port');
+    const feedback = document.getElementById('connection-feedback');
+    function showConnection() {
+        document.getElementById('connection-current').textContent = connectionSettings.format(apiSettings);
+    }
+    showConnection();
+    document.getElementById('settings-button').addEventListener('click', () => {
+        hostInput.value = apiSettings.host;
+        portInput.value = apiSettings.port;
+        feedback.textContent = '';
+        dialog.showModal();
+    });
+    document.getElementById('connection-close').addEventListener('click', () => dialog.close());
+    document.getElementById('connection-form').addEventListener('submit', event => {
+        event.preventDefault();
+        try {
+            apiSettings = connectionSettings.save(localStorage, hostInput.value, portInput.value);
+            showConnection();
+            dialog.close();
+            log('接続先を保存しました: ' + connectionSettings.format(apiSettings), 'info');
+        } catch (error) {
+            feedback.textContent = error.message;
+        }
+    });
+    document.getElementById('connection-reset').addEventListener('click', () => {
+        hostInput.value = '127.0.0.1';
+        portInput.value = '8000';
+        feedback.textContent = '初期値を入力しました。「保存」で反映します。';
+    });
     const tagButton = document.getElementById('tag-button');
     tagButton.addEventListener('click', () => {
         if (isTagging) {
@@ -51,6 +82,8 @@ async function runAiTagging() {
     isTagging = true;
     cancelTagging = false;
     updateTagButton(true);
+    // Keep one destination for the whole job; edits apply to the next run.
+    const destination = { ...apiSettings };
     try {
         const items = await eagle.item.getSelected();
         if (items.length === 0) {
@@ -147,8 +180,8 @@ async function runAiTagging() {
                 const tags = await new Promise((resolve, reject) => {
                     const request = http.request({
                         method: 'POST',
-                        host: API_HOST,
-                        port: API_PORT,
+                        hostname: destination.host,
+                        port: destination.port,
                         path: API_PATH,
                         headers: form.getHeaders(),
                         timeout: timeout, // タイムアウト設定

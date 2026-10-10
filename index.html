@@ -217,17 +217,40 @@
         #tag-button.tagging:hover {
             background-color: #be5046;
         }
+        .connection-row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
+        #connection-current { font-size:12px; overflow-wrap:anywhere; }
+        #settings-button, .connection-actions button { padding:8px 12px; border:1px solid #596273; border-radius:5px; background:#23272e; color:#e3e7ef; cursor:pointer; }
+        #connection-dialog { width:min(420px,calc(100vw - 60px)); background:#282c34; color:#e3e7ef; border:1px solid #596273; border-radius:10px; padding:22px; }
+        #connection-dialog::backdrop { background:rgba(0,0,0,.65); }
+        #connection-dialog h2 { margin-top:0; font-size:18px; }
+        #connection-form label { display:block; margin:14px 0; }
+        #connection-form input { display:block; width:100%; box-sizing:border-box; margin-top:6px; padding:10px; border:1px solid #596273; border-radius:5px; background:#1d2127; color:#fff; }
+        .connection-help { color:#abb2bf; font-size:12px; line-height:1.7; }
+        .connection-actions { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; margin-top:18px; }
+        #connection-save { background:#356e62; }
+        #connection-feedback { color:#e5c07b; min-height:20px; }
     </style>
 </head>
 
 <body>
     <div id="button-bar">
+        <div class="connection-row"><span>接続先: <span id="connection-current"></span></span><button id="settings-button" type="button">接続設定</button></div>
         <button id="tag-button">選択した画像・動画にAIタグ付けを実行</button>
         <div id="sub-button-row">
             <button id="clear-log-button">ログをクリア</button>
             <button id="toggle-autoscroll-button">自動スクロール: ON</button>
         </div>
     </div>
+    <dialog id="connection-dialog" aria-labelledby="connection-title">
+        <h2 id="connection-title">APIサーバーの接続設定</h2>
+        <form id="connection-form">
+            <label>IPアドレス・ホスト名<input id="connection-host" type="text" required maxlength="253" placeholder="例: 192.168.1.10" autocomplete="off" spellcheck="false"></label>
+            <label>ポート番号<input id="connection-port" type="number" required min="1" max="65535" step="1" inputmode="numeric"></label>
+            <p class="connection-help">同じPCなら 127.0.0.1、別のPCならそのPCのIPアドレスを指定します。変更は次回のタグ付けから使われます。</p>
+            <p id="connection-feedback" role="status"></p>
+            <div class="connection-actions"><button id="connection-reset" type="button">初期値に戻す</button><button id="connection-close" type="button">キャンセル</button><button id="connection-save" type="submit">保存</button></div>
+        </form>
+    </dialog>
     <div id="progress-bar-container" style="display:none;">
         <div id="progress-bar"></div>
         <span id="progress-text"></span>
@@ -334,6 +357,7 @@
         });
     </script>
 
+    <script src="./js/connection-settings.js"></script>
     <script src="./js/plugin.js"></script>
 </body>
 
