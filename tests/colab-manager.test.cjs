@@ -46,5 +46,13 @@ const manager = createManager({
     fail=false;
     await manager.ensure();
     assert.equal(calls,3,'A failed recovery allows a later manual retry');
+    const fallback = path.join(root,'shared-colab.json');
+    const shared = createManager({configPath:path.join(root,'missing.json'),fallbackPaths:[fallback],storage,settings,
+        exists:file => file === fallback,
+        readFile:file => JSON.stringify(file === fallback ? config : {url:'https://shared.trycloudflare.com',token:'shared-token'}),
+        spawnProcess:() => { const process = new EventEmitter(); process.stdout=new EventEmitter(); process.stderr=new EventEmitter(); process.kill=()=>{}; setImmediate(()=>process.emit('close',0)); return process; }});
+    assert.equal(shared.available(),true,'Shared configuration works outside installed plugin directory');
+    shared.setEnabled(true);
+    assert.equal((await shared.ensure()).host,'shared.trycloudflare.com');
     console.log('Colab auto recovery: settings update, concurrency, privacy and failure checks passed.');
 })().catch(error => {console.error(error); process.exitCode=1;});

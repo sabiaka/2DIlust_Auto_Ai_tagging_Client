@@ -2,10 +2,11 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 
-function createManager({ configPath, storage, settings, onProgress = () => {}, spawnProcess = spawn, readFile = fs.readFileSync, exists = fs.existsSync }) {
+function createManager({ configPath, storage, settings, onProgress = () => {}, spawnProcess = spawn, readFile = fs.readFileSync, exists = fs.existsSync, fallbackPaths = process.env.APPDATA ? [path.join(process.env.APPDATA, 'Eagle', 'ai-tagger-colab.json')] : [] }) {
     const modeKey = 'ai-tagger.colab-auto.v1';
     let inFlight = null;
-    function available() { return exists(configPath); }
+    function findConfig() { return [configPath, ...fallbackPaths].find(file => exists(file)); }
+    function available() { return Boolean(findConfig()); }
     function enabled() { return available() && storage.getItem(modeKey) !== 'false'; }
     function setEnabled(value) { storage.setItem(modeKey, String(Boolean(value))); }
     function ensure() {
@@ -14,7 +15,9 @@ function createManager({ configPath, storage, settings, onProgress = () => {}, s
         return inFlight;
     }
     async function recover() {
-        const config = JSON.parse(readFile(configPath, 'utf8'));
+        const locatedConfig = findConfig();
+        if (!locatedConfig) throw new Error('このPCのColab自動接続設定が見つかりません。');
+        const config = JSON.parse(readFile(locatedConfig, 'utf8'));
         if (!path.isAbsolute(config.helper) || !path.isAbsolute(config.connectionFile)) {
             throw new Error('Colab自動接続の設定ファイルに絶対パスが必要です。');
         }
