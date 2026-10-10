@@ -123,6 +123,7 @@ async function runAiTagging() {
                 break;
             }
             const item = items[i];
+            const ext = item.ext.toLowerCase();
             try {
                 const fileBuffer = fs.readFileSync(item.filePath);
                 if (fileBuffer.length === 0) {
@@ -140,7 +141,6 @@ async function runAiTagging() {
                 const form = new FormData();
 
                 // ★★★ ファイルの種類(Content-Type)をちゃんと教える ★★★
-                const ext = item.ext.toLowerCase();
                 let contentType = 'application/octet-stream'; // デフォルト
 
                 // ↓↓↓ ここに動画の判定を追加したよ！ ↓↓↓
@@ -297,10 +297,11 @@ async function runAiTagging() {
         }
     } catch (err) {
         log(`予期せぬ大エラーが発生しました: ${err.message}`, 'error');
+    } finally {
+        isTagging = false;
+        updateTagButton(false);
+        cancelTagging = false;
     }
-    isTagging = false;
-    updateTagButton(false);
-    cancelTagging = false;
 }
 
 // ログをUIに表示するためのヘルパー関数
