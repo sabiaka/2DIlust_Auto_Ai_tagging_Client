@@ -10,6 +10,10 @@ const https = require('https');
 // --- APIサーバーの設定 ---
 const connectionSettings = window.aiTaggerConnectionSettings;
 let apiSettings = connectionSettings.load(localStorage);
+const colabManager = require(path.join(__dirname, 'js', 'colab-manager.js')).createManager({
+    configPath: path.join(__dirname, 'colab-auto.json'), storage: localStorage,
+    settings: connectionSettings, onProgress: message => log(message, 'info'),
+});
 const API_PATH = '/tag';
 
 // --- メインの処理 ---
@@ -38,6 +42,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const portInput = document.getElementById('connection-port');
     const tokenInput = document.getElementById('connection-token');
     const feedback = document.getElementById('connection-feedback');
+    const autoColab = document.getElementById('connection-auto-colab');
     function showConnection() {
         document.getElementById('connection-current').textContent = connectionSettings.format(apiSettings);
     }
@@ -46,6 +51,8 @@ window.addEventListener('DOMContentLoaded', () => {
         hostInput.value = apiSettings.protocol === 'https:' ? connectionSettings.format(apiSettings) : apiSettings.host;
         portInput.value = apiSettings.port;
         tokenInput.value = apiSettings.token;
+        autoColab.checked = colabManager.enabled();
+        autoColab.disabled = !colabManager.available();
         feedback.textContent = '';
         dialog.showModal();
     });
@@ -54,6 +61,7 @@ window.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         try {
             apiSettings = connectionSettings.save(localStorage, hostInput.value, portInput.value, tokenInput.value);
+            colabManager.setEnabled(autoColab.checked);
             showConnection();
             dialog.close();
             log('接続先を保存しました: ' + connectionSettings.format(apiSettings), 'info');
@@ -65,6 +73,7 @@ window.addEventListener('DOMContentLoaded', () => {
         hostInput.value = '127.0.0.1';
         portInput.value = '8000';
         tokenInput.value = '';
+        autoColab.checked = false;
         feedback.textContent = '初期値を入力しました。「保存」で反映します。';
     });
     const tagButton = document.getElementById('tag-button');
@@ -87,13 +96,18 @@ async function runAiTagging() {
     cancelTagging = false;
     updateTagButton(true);
     // Keep one destination for the whole job; edits apply to the next run.
-    const destination = { ...apiSettings };
     try {
         const items = await eagle.item.getSelected();
         if (items.length === 0) {
             log('画像・動画をせんたーく！してね！', 'warn');
             return;
         }
+        if (colabManager.enabled()) {
+            apiSettings = await colabManager.ensure();
+            document.getElementById('connection-current').textContent = connectionSettings.format(apiSettings);
+            if (cancelTagging) return;
+        }
+        const destination = { ...apiSettings };
         // 動画ファイルの数をカウント
         const videoCount = items.filter(item => {
             const ext = item.ext.toLowerCase();

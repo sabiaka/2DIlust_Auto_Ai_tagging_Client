@@ -95,3 +95,20 @@ LAN用のIP・ポート設定は継続利用できます。
 
 設定の検証: `node tests/connection-settings.test.cjs`
 リクエストの検証: `node tests/client-request.test.cjs`
+
+### Colab自動接続（Windows）
+
+プラグインのルートに `colab-auto.json` を配置すると、接続設定の「Colabの起動と接続先更新を自動で行う」が有効になります。
+このPCでは設定済みです。タグ付けボタンを押すと、CLIで専用セッションを確認し、停止していればT4を起動してURLとトークンを自動保存します。
+無操作時の定期再起動は行いません。認証期限切れやGPU割り当て失敗の場合はエラー表示して停止します。
+LAN接続へ戻すときは自動接続をオフにしてください。終了時は `Stop-Colab-API.bat` で停止します。
+
+設定ファイルは次の2つの絶対パスを指定します。機器固有の設定なのでGitには含めません。
+
+```json
+{"helper":"C:/path/to/outputs/ensure-colab-api.ps1","connectionFile":"C:/path/to/outputs/Colab-connection.json"}
+```
+
+Windowsに認証済みのColab CLIと、本作業で作成したoutputs一式が必要です。プラグイン単体でCLIの導入やGoogle認証を行うものではありません。
+
+自動更新の検証: `node tests/colab-manager.test.cjs`

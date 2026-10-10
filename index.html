@@ -247,7 +247,8 @@
             <label>接続先URL・IPアドレス<input id="connection-host" type="text" required maxlength="512" placeholder="例: https://example.trycloudflare.com" autocomplete="off" spellcheck="false"></label>
             <label>ポート番号<input id="connection-port" type="number" required min="1" max="65535" step="1" inputmode="numeric"></label>
             <label>APIトークン（Colab用）<input id="connection-token" type="password" maxlength="512" autocomplete="off" spellcheck="false" placeholder="LAN接続で認証なしの場合は空欄"></label>
-            <p class="connection-help">Colabでは出力されたHTTPS URLとAPIトークンを貼り付けます。URL指定時はURL内のポートが優先されます。LAN接続はIPとポートを指定できます。変更は次回のタグ付けから使われます。</p>
+            <label><input id="connection-auto-colab" type="checkbox" style="display:inline;width:auto"> Colabの起動と接続先更新を自動で行う</label>
+            <p class="connection-help">自動接続が有効な場合、タグ付け前にColabを確認し、必要ならT4を起動してURLとトークンを更新します。初回準備には数分かかります。起動中は計算枠を消費します。LAN接続では自動接続をオフにしてください。</p>
             <p id="connection-feedback" role="status"></p>
             <div class="connection-actions"><button id="connection-reset" type="button">初期値に戻す</button><button id="connection-close" type="button">キャンセル</button><button id="connection-save" type="submit">保存</button></div>
         </form>

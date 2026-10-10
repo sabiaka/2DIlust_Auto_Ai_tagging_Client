@@ -6,8 +6,9 @@ const { EventEmitter } = require('node:events');
 const settings = require('../js/connection-settings');
 const source = fs.readFileSync(path.join(__dirname, '../js/plugin.js'), 'utf8');
 
-async function run(config, expectedTransport, failure = null) {
+async function run(config, expectedTransport, failure = null, automatic = false) {
     let captured, saved = false;
+    let ensured = false;
     const logs = [];
     const request = transport => ({
         request(options, callback) {
@@ -37,6 +38,7 @@ async function run(config, expectedTransport, failure = null) {
     }};
     const context = vm.createContext({
         require(name) {
+            if (name.endsWith('colab-manager.js')) return {createManager:() => ({enabled:() => automatic,ensure:async () => {ensured=true;return config;}})};
             if (name==='fs') return {readFileSync:() => {
                 if (failure === 'file') throw new Error('ENOENT test image');
                 return Buffer.from('test image');
@@ -48,10 +50,11 @@ async function run(config, expectedTransport, failure = null) {
         window:{aiTaggerConnectionSettings:settings,addEventListener(){},appendToLog(message){logs.push(message);}},
         document, localStorage:{getItem:() => JSON.stringify(config)}, log(){},
         eagle:{item:{getSelected:async () => [{name:'test.png',ext:'png',filePath:'test.png',tags:[],save:async () => {saved=true;}}]}},
-        console:{log(){}},setTimeout,Buffer,
+        console:{log(){}},setTimeout,Buffer,__dirname:path.join(__dirname,'..'),
     });
     vm.runInContext(source,context);
     await vm.runInContext('runAiTagging()',context);
+    assert.equal(ensured,automatic);
     assert.equal(vm.runInContext('isTagging',context),false);
     assert.equal(logs.some(message => message.includes('ext is not defined')),false);
     if (failure === 'file') {
@@ -74,6 +77,7 @@ async function run(config, expectedTransport, failure = null) {
     await run({host:'example.trycloudflare.com',port:443,protocol:'https:',token:'test-token'},'https','http');
     await run({host:'127.0.0.1',port:8000},'http','file');
     await run({host:'example.trycloudflare.com',port:443,protocol:'https:',token:'test-token'},'https','proxy');
+    await run({host:'new.trycloudflare.com',port:443,protocol:'https:',token:'new-token'},'https',null,true);
     console.log('Client job selects HTTPS + bearer token; legacy HTTP still saves returned tags.');
 })().catch(error => { console.error(error); process.exitCode=1; });
 
