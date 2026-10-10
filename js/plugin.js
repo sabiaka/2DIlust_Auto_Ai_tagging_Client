@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const FormData = require('form-data');
 const http = require('http'); // axiosの代わりにhttpモジュールを使う
+const https = require('https');
 
 // --- APIサーバーの設定 ---
 const connectionSettings = window.aiTaggerConnectionSettings;
@@ -35,14 +36,16 @@ window.addEventListener('DOMContentLoaded', () => {
     const dialog = document.getElementById('connection-dialog');
     const hostInput = document.getElementById('connection-host');
     const portInput = document.getElementById('connection-port');
+    const tokenInput = document.getElementById('connection-token');
     const feedback = document.getElementById('connection-feedback');
     function showConnection() {
         document.getElementById('connection-current').textContent = connectionSettings.format(apiSettings);
     }
     showConnection();
     document.getElementById('settings-button').addEventListener('click', () => {
-        hostInput.value = apiSettings.host;
+        hostInput.value = apiSettings.protocol === 'https:' ? connectionSettings.format(apiSettings) : apiSettings.host;
         portInput.value = apiSettings.port;
+        tokenInput.value = apiSettings.token;
         feedback.textContent = '';
         dialog.showModal();
     });
@@ -50,7 +53,7 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('connection-form').addEventListener('submit', event => {
         event.preventDefault();
         try {
-            apiSettings = connectionSettings.save(localStorage, hostInput.value, portInput.value);
+            apiSettings = connectionSettings.save(localStorage, hostInput.value, portInput.value, tokenInput.value);
             showConnection();
             dialog.close();
             log('接続先を保存しました: ' + connectionSettings.format(apiSettings), 'info');
@@ -61,6 +64,7 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('connection-reset').addEventListener('click', () => {
         hostInput.value = '127.0.0.1';
         portInput.value = '8000';
+        tokenInput.value = '';
         feedback.textContent = '初期値を入力しました。「保存」で反映します。';
     });
     const tagButton = document.getElementById('tag-button');
@@ -178,12 +182,13 @@ async function runAiTagging() {
                 log(`[${item.name}] の処理を開始します...${isVideo ? ' (動画ファイル - 時間がかかる場合があります)' : ''}`, 'info');
                 
                 const tags = await new Promise((resolve, reject) => {
-                    const request = http.request({
+                    const transport = destination.protocol === 'https:' ? https : http;
+                    const request = transport.request({
                         method: 'POST',
                         hostname: destination.host,
                         port: destination.port,
                         path: API_PATH,
-                        headers: form.getHeaders(),
+                        headers: { ...form.getHeaders(), ...(destination.token ? { Authorization: 'Bearer ' + destination.token } : {}) },
                         timeout: timeout, // タイムアウト設定
                     }, (response) => {
                         let responseData = '';

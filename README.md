@@ -87,4 +87,11 @@ npm install
 別のPCへ接続する場合は、そのPCでAPIがLAN向けに待ち受けている必要があります。
 APIサーバーのリポジトリにある `Start-Server-LAN.bat` で起動すると、LANからの接続を受け付けます。
 
+Colab対応版（`feature/colab-api`）ではHTTPS URLとAPIトークンにも対応します。
+ノートブックに表示されるURLとトークンを「接続設定」に貼り付けて保存してください。
+URL指定時のポートはURL内の指定を使い、HTTPSで省略した場合は443になります。
+トークンはプラグインのローカル保存領域に保存され、接続先表示やログには出しません。
+LAN用のIP・ポート設定は継続利用できます。
+
 設定の検証: `node tests/connection-settings.test.cjs`
+リクエストの検証: `node tests/client-request.test.cjs`
