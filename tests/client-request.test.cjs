@@ -68,7 +68,7 @@ async function run(config, expectedTransport, failure = null, automatic = false)
     assert.equal(captured.headers['content-type'],'multipart/form-data; boundary=test');
     assert.equal(captured.headers.Authorization,config.token ? 'Bearer '+config.token : undefined);
     assert.equal(saved,!failure);
-    if (failure === 'http') assert.ok(logs.some(message => message.includes('Unauthorized')));
+    if (failure === 'http') assert.ok(logs.some(message => message.includes('HTTPエラー: 401')));
     if (failure === 'proxy') assert.ok(logs.some(message => message.includes('HTTP 530') && message.includes('Colab')));
 }
 (async () => {

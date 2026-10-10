@@ -107,7 +107,9 @@ async function runAiTagging() {
             document.getElementById('connection-current').textContent = connectionSettings.format(apiSettings);
             if (cancelTagging) return;
         }
-        const destination = { ...apiSettings };
+        let destination = { ...apiSettings };
+        const retriedItems = new Set();
+        let recoveryCount = 0;
         // 動画ファイルの数をカウント
         const videoCount = items.filter(item => {
             const ext = item.ext.toLowerCase();
@@ -213,6 +215,7 @@ async function runAiTagging() {
                                     const error = new Error(response.statusCode === 530
                                         ? 'HTTP 530: 接続先のColab APIが停止している可能性があります。再起動後のURLとトークンを設定してください。'
                                         : `HTTPエラー: ${response.statusCode}`);
+                                    error.statusCode = response.statusCode;
                                     try {
                                         error.response = { data: JSON.parse(responseData) };
                                     } catch (_) {
@@ -238,7 +241,9 @@ async function runAiTagging() {
                     // タイムアウト処理
                     request.on('timeout', () => {
                         request.destroy();
-                        reject(new Error(`タイムアウト: ${isVideo ? '動画ファイルの処理に時間がかかりすぎました' : '画像ファイルの処理に時間がかかりすぎました'} (${timeout/1000}秒)`));
+                        const error = new Error(`タイムアウト: ${isVideo ? '動画ファイルの処理に時間がかかりすぎました' : '画像ファイルの処理に時間がかかりすぎました'} (${timeout/1000}秒)`);
+                        error.code = 'ETIMEDOUT';
+                        reject(error);
                     });
                     
                     request.on('error', (err) => reject(err));
@@ -293,6 +298,25 @@ async function runAiTagging() {
                 // UI更新のためにイベントループをyield
                 await new Promise(r => setTimeout(r, 0));
             } catch (err) {
+                const unavailable = [401, 502, 503, 504, 521, 522, 523, 524, 530].includes(err.statusCode)
+                    || ['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE'].includes(err.code);
+                if (unavailable) {
+                    if (cancelTagging) break;
+                    if (!colabManager.enabled() || retriedItems.has(i) || recoveryCount >= 3) {
+                        throw new Error(`[${item.name}] 接続障害のため後続の送信を停止しました: ${err.message}`);
+                    }
+                    retriedItems.add(i);
+                    recoveryCount++;
+                    log(`[${item.name}] 接続障害を検出しました。後続の送信を止めてColabを復旧します。`, 'warn');
+                    // Recovery failures escape the item loop and stop the whole job.
+                    apiSettings = await colabManager.ensure();
+                    destination = { ...apiSettings };
+                    document.getElementById('connection-current').textContent = connectionSettings.format(apiSettings);
+                    if (cancelTagging) break;
+                    log(`[${item.name}] 更新した接続先で再試行します。`, 'info');
+                    i--;
+                    continue;
+                }
                 const isVideo = ['mp4', 'mov', 'avi', 'wmv', 'mpeg', 'mpg'].includes(ext);
                 if (isVideo) {
                     log(`[${item.name}] のタグ付けでエラー発生: ${err.message} (動画ファイル)`, 'error', item.filePath);
@@ -322,7 +346,9 @@ async function runAiTagging() {
             setTimeout(() => { progressBarContainer.style.display = 'none'; }, 500);
         }
     } catch (err) {
-        log(`予期せぬ大エラーが発生しました: ${err.message}`, 'error');
+        log(`タグ付けを停止しました: ${err.message}`, 'error');
+        const progressText = document.getElementById('progress-text');
+        if (progressText) progressText.textContent += '（エラーで停止）';
     } finally {
         isTagging = false;
         updateTagButton(false);
