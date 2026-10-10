@@ -85,6 +85,6 @@ npm install
 実行中のタグ付けは開始時の接続先を使い、変更した設定は次回の実行から使います。
 
 別のPCへ接続する場合は、そのPCでAPIがLAN向けに待ち受けている必要があります。
-現在のローカル起動用batは `127.0.0.1` のみに待ち受けます。
+APIサーバーのリポジトリにある `Start-Server-LAN.bat` で起動すると、LANからの接続を受け付けます。
 
 設定の検証: `node tests/connection-settings.test.cjs`
