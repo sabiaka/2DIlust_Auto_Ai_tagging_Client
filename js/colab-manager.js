@@ -21,12 +21,12 @@ function createManager({ configPath, storage, settings, onProgress = () => {}, s
         }
         return settings.save(storage, connection.url, 443, connection.token);
     }
-    function ensure() {
+    function ensure({ forceRestart = false } = {}) {
         if (inFlight) return inFlight;
-        inFlight = recover().finally(() => { inFlight = null; });
+        inFlight = recover(forceRestart).finally(() => { inFlight = null; });
         return inFlight;
     }
-    async function recover() {
+    async function recover(forceRestart) {
         const locatedConfig = findConfig();
         if (!locatedConfig) throw new Error('このPCのColab自動接続設定が見つかりません。');
         const config = JSON.parse(readFile(locatedConfig, 'utf8'));
@@ -35,7 +35,9 @@ function createManager({ configPath, storage, settings, onProgress = () => {}, s
         }
         onProgress('Colabの接続を確認しています。必要な場合は自動で再起動します。');
         await new Promise((resolve, reject) => {
-            const child = spawnProcess('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', config.helper], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+            const args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', config.helper];
+            if (forceRestart) args.push('-ForceRestart');
+            const child = spawnProcess('powershell.exe', args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
             let pending = '';
             let settled = false;
             const timer = setTimeout(() => {

@@ -328,7 +328,7 @@ async function runAiTagging() {
                     recoveryCount++;
                     log(`[${item.name}] 接続障害を検出しました。後続の送信を止めてColabを復旧します。`, 'warn');
                     // Recovery failures escape the item loop and stop the whole job.
-                    apiSettings = await colabManager.ensure();
+                    apiSettings = await colabManager.ensure({ forceRestart: [502, 503, 504, 521, 522, 523, 524, 530].includes(err.statusCode) });
                     destination = { ...apiSettings };
                     document.getElementById('connection-current').textContent = connectionSettings.format(apiSettings);
                     if (cancelTagging) break;

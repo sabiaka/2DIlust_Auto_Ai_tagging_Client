@@ -8,6 +8,7 @@ const storage = {getItem:key => values.get(key) ?? null, setItem:(key,value) => 
 const root = path.resolve(__dirname);
 const config = {helper:path.join(root,'helper.ps1'),connectionFile:path.join(root,'connection.json')};
 let calls = 0, fail = false, child;
+let lastArgs;
 const messages = [];
 const manager = createManager({
     configPath:path.join(root,'colab-auto.json'),storage,settings,
@@ -17,7 +18,8 @@ const manager = createManager({
     onProgress:message => messages.push(message),
     spawnProcess(executable,args,options) {
         assert.equal(executable,'powershell.exe');
-        assert.equal(args.at(-1),config.helper);
+        assert.equal(args[args.indexOf('-File')+1],config.helper);
+        lastArgs=args;
         assert.equal(options.windowsHide,true);
         calls++;
         child = new EventEmitter(); child.stdout = new EventEmitter(); child.stderr = new EventEmitter(); child.kill=()=>{};
@@ -50,6 +52,8 @@ const manager = createManager({
     fail=false;
     await manager.ensure();
     assert.equal(calls,3,'A failed recovery allows a later manual retry');
+    await manager.ensure({forceRestart:true});
+    assert.equal(lastArgs.at(-1),'-ForceRestart');
     const fallback = path.join(root,'shared-colab.json');
     const shared = createManager({configPath:path.join(root,'missing.json'),fallbackPaths:[fallback],storage,settings,
         exists:file => file === fallback,
