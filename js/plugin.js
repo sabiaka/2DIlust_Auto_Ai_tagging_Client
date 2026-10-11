@@ -16,6 +16,8 @@ const colabManager = require(path.join(__dirname, 'js', 'colab-manager.js')).cre
 });
 const API_PATH = '/tag';
 const REPAIR_MODE_KEY = 'ai-tagger.repair-mojibake.v1';
+const processingSettings = require(path.join(__dirname,'js','processing-settings.js'));
+const batchRequest = require(path.join(__dirname,'js','batch-request.js'));
 function repairModeEnabled() { return localStorage.getItem(REPAIR_MODE_KEY) === 'true'; }
 function hasBrokenTags(item) { return (item.tags || []).some(tag => typeof tag === 'string' && tag.includes('\uFFFD')); }
 
@@ -57,6 +59,10 @@ function updateTagButton(running) {
 // HTMLの準備ができたら、ボタンにクリックイベントをセットする
 window.addEventListener('DOMContentLoaded', () => {
     refreshConnectionFromJson();
+    document.querySelectorAll('[data-settings-tab]').forEach(button=>button.addEventListener('click',()=>{
+        document.querySelectorAll('[data-settings-tab]').forEach(tab=>tab.setAttribute('aria-selected',String(tab===button)));
+        document.querySelectorAll('[data-settings-panel]').forEach(panel=>{panel.hidden=panel.dataset.settingsPanel!==button.dataset.settingsTab;});
+    }));
     const dialog = document.getElementById('connection-dialog');
     const hostInput = document.getElementById('connection-host');
     const portInput = document.getElementById('connection-port');
@@ -64,6 +70,10 @@ window.addEventListener('DOMContentLoaded', () => {
     const feedback = document.getElementById('connection-feedback');
     const autoColab = document.getElementById('connection-auto-colab');
     const repairInput = document.getElementById('repair-mojibake');
+    const gpuInput = document.getElementById('processing-gpu');
+    const batchInput = document.getElementById('processing-batch');
+    const batchSizeInput = document.getElementById('processing-batch-size');
+    batchInput.addEventListener('change',()=>{batchSizeInput.disabled=!batchInput.checked;});
     function showConnection() {
         document.getElementById('connection-current').textContent = connectionSettings.format(apiSettings);
     }
@@ -76,6 +86,11 @@ window.addEventListener('DOMContentLoaded', () => {
         autoColab.checked = colabManager.enabled();
         autoColab.disabled = !colabManager.available();
         repairInput.checked = repairModeEnabled();
+        const processing = processingSettings.load(localStorage);
+        gpuInput.value = processing.gpu;
+        batchInput.checked = processing.batch;
+        batchSizeInput.value = processing.batchSize;
+        batchSizeInput.disabled = !processing.batch;
         feedback.textContent = '';
         dialog.showModal();
     });
@@ -86,6 +101,7 @@ window.addEventListener('DOMContentLoaded', () => {
             apiSettings = connectionSettings.save(localStorage, hostInput.value, portInput.value, tokenInput.value);
             colabManager.setEnabled(autoColab.checked);
             localStorage.setItem(REPAIR_MODE_KEY, String(repairInput.checked));
+            processingSettings.save(localStorage,{gpu:gpuInput.value,batch:batchInput.checked,batchSize:batchSizeInput.value});
             updateTagButton(isTagging);
             showConnection();
             dialog.close();
@@ -121,6 +137,7 @@ async function runAiTagging() {
     cancelTagging = false;
     updateTagButton(true);
     const repairMode = repairModeEnabled();
+    const processing = processingSettings.load(localStorage);
     let backupPath = null;
     // Keep one destination for the whole job; edits apply to the next run.
     try {
@@ -134,12 +151,15 @@ async function runAiTagging() {
         }
         if (repairMode) log(`文字化けタグ修復: 対象 ${items.length} 件（対象外 ${selectedItems.length - items.length} 件）。正常な既存タグは残します。`, 'info');
         if (colabManager.enabled()) {
-            apiSettings = await colabManager.ensure();
+            apiSettings = await colabManager.ensure({gpu:processing.gpu});
             document.getElementById('connection-current').textContent = connectionSettings.format(apiSettings);
             if (cancelTagging) return;
         }
         let destination = { ...apiSettings };
         const itemRecoveryCounts = new Map();
+        const batchResults = new Map();
+        let batchEnabled = processing.batch;
+        if (batchEnabled) log(`画像を最大${processing.batchSize}枚ずつまとめて送信します。GPU推論は1枚ずつ行います。`, 'info');
         // 動画ファイルの数をカウント
         const videoCount = items.filter(item => {
             const ext = item.ext.toLowerCase();
@@ -171,6 +191,18 @@ async function runAiTagging() {
             const item = items[i];
             const ext = item.ext.toLowerCase();
             try {
+                if (batchEnabled && !batchResults.has(i)) {
+                    try {
+                        await batchRequest.fill({items,start:i,size:processing.batchSize,destination,cache:batchResults,readFile:file=>fs.readFileSync(file)});
+                    } catch (error) {
+                        if ([404,405,413].includes(error.statusCode)) {
+                            batchEnabled=false;
+                            log('接続先のバッチ対応または容量制限により、この実行は1枚ずつ送信します。', 'warn');
+                        } else throw error;
+                    }
+                }
+                const cachedResult = batchResults.get(i);
+                if (cachedResult && cachedResult.message && !Array.isArray(cachedResult)) throw cachedResult;
                 const fileBuffer = fs.readFileSync(item.filePath);
                 if (fileBuffer.length === 0) {
                     // サムネイル用画像パス
@@ -227,7 +259,7 @@ async function runAiTagging() {
                 
                 log(`[${item.name}] の処理を開始します...${isVideo ? ' (動画ファイル - 時間がかかる場合があります)' : ''}`, 'info');
                 
-                const tags = await new Promise((resolve, reject) => {
+                const tags = batchResults.has(i) ? cachedResult : await new Promise((resolve, reject) => {
                     const transport = destination.protocol === 'https:' ? https : http;
                     const request = transport.request({
                         method: 'POST',
@@ -290,6 +322,10 @@ async function runAiTagging() {
                     request.on('error', (err) => reject(err));
                     form.pipe(request);
                 });
+
+                if (!Array.isArray(tags) || !tags.every(tag=>typeof tag==='string')) throw Error('APIのタグ形式が不正です。既存タグは変更しません。');
+                if (repairMode && (!tags.length || tags.some(tag=>tag.includes('\uFFFD')))) throw Error('修復に使える正常なタグが返りませんでした。既存タグは変更しません。');
+                batchResults.delete(i);
 
                 // タグ付け処理
                 if (tags && tags.length > 0) {
@@ -365,7 +401,7 @@ async function runAiTagging() {
                     itemRecoveryCounts.set(i, attempts + 1);
                     log(`[${item.name}] 接続障害を検出しました。後続の送信を止めてColabを復旧します（この画像で ${attempts + 1}/3 回目）。`, 'warn');
                     // Recovery failures escape the item loop and stop the whole job.
-                    apiSettings = await colabManager.ensure({ forceRestart: [502, 503, 504, 521, 522, 523, 524, 530].includes(err.statusCode) });
+                    apiSettings = await colabManager.ensure({ gpu:processing.gpu, forceRestart: [502, 503, 504, 521, 522, 523, 524, 530].includes(err.statusCode) });
                     destination = { ...apiSettings };
                     document.getElementById('connection-current').textContent = connectionSettings.format(apiSettings);
                     if (cancelTagging) break;
@@ -373,6 +409,7 @@ async function runAiTagging() {
                     i--;
                     continue;
                 }
+                batchResults.delete(i);
                 const isVideo = ['mp4', 'mov', 'avi', 'wmv', 'mpeg', 'mpg'].includes(ext);
                 if (isVideo) {
                     log(`[${item.name}] のタグ付けでエラー発生: ${err.message} (動画ファイル)`, 'error', item.filePath);

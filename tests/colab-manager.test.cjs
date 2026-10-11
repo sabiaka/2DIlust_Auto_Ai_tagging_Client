@@ -54,6 +54,9 @@ const manager = createManager({
     assert.equal(calls,3,'A failed recovery allows a later manual retry');
     await manager.ensure({forceRestart:true});
     assert.equal(lastArgs.at(-1),'-ForceRestart');
+    await manager.ensure({gpu:'L4'});
+    assert.equal(lastArgs[lastArgs.indexOf('-Gpu')+1],'L4');
+    await assert.rejects(manager.ensure({gpu:'A100'}),/GPU設定/);
     const fallback = path.join(root,'shared-colab.json');
     const shared = createManager({configPath:path.join(root,'missing.json'),fallbackPaths:[fallback],storage,settings,
         exists:file => file === fallback,

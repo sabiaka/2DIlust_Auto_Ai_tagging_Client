@@ -21,12 +21,13 @@ function createManager({ configPath, storage, settings, onProgress = () => {}, s
         }
         return settings.save(storage, connection.url, 443, connection.token);
     }
-    function ensure({ forceRestart = false } = {}) {
+    function ensure({ forceRestart = false, gpu = 'T4' } = {}) {
+        if (!['T4','L4'].includes(gpu)) return Promise.reject(new Error('GPU設定が不正です。'));
         if (inFlight) return inFlight;
-        inFlight = recover(forceRestart).finally(() => { inFlight = null; });
+        inFlight = recover(forceRestart,gpu).finally(() => { inFlight = null; });
         return inFlight;
     }
-    async function recover(forceRestart) {
+    async function recover(forceRestart,gpu) {
         const locatedConfig = findConfig();
         if (!locatedConfig) throw new Error('このPCのColab自動接続設定が見つかりません。');
         const config = JSON.parse(readFile(locatedConfig, 'utf8'));
@@ -36,6 +37,7 @@ function createManager({ configPath, storage, settings, onProgress = () => {}, s
         onProgress('Colabの接続を確認しています。必要な場合は自動で再起動します。');
         await new Promise((resolve, reject) => {
             const args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', config.helper];
+            args.push('-Gpu',gpu);
             if (forceRestart) args.push('-ForceRestart');
             const child = spawnProcess('powershell.exe', args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
             let pending = '';
@@ -56,7 +58,7 @@ function createManager({ configPath, storage, settings, onProgress = () => {}, s
                 pending = lines.pop();
                 for (const line of lines) {
                     // Only display our progress markers; never forward credentials or arbitrary CLI output.
-                    if (line.startsWith('[colab-auto] Starting')) onProgress('ColabのT4を起動しています。初回準備には数分かかります。');
+                    if (line.startsWith('[colab-auto] Starting')) onProgress(`Colabの${gpu}を起動しています。初回準備には数分かかります。`);
                     if (line.startsWith('[colab-auto] Restarting')) onProgress('停止したAPIのランタイムを作り直しています。');
                 }
             });

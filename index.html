@@ -220,7 +220,7 @@
         .connection-row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:10px; }
         #connection-current { font-size:12px; overflow-wrap:anywhere; }
         #settings-button, .connection-actions button { padding:8px 12px; border:1px solid #596273; border-radius:5px; background:#23272e; color:#e3e7ef; cursor:pointer; }
-        #connection-dialog { width:min(420px,calc(100vw - 60px)); background:#282c34; color:#e3e7ef; border:1px solid #596273; border-radius:10px; padding:22px; }
+        #connection-dialog { width:min(480px,calc(100vw - 48px)); max-height:calc(100vh - 48px); overflow:auto; box-sizing:border-box; background:#20252d; color:#e3e7ef; border:1px solid #596273; border-radius:12px; padding:22px; }
         #connection-dialog::backdrop { background:rgba(0,0,0,.65); }
         #connection-dialog h2 { margin-top:0; font-size:18px; }
         #connection-form label { display:block; margin:14px 0; }
@@ -229,12 +229,23 @@
         .connection-actions { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; margin-top:18px; }
         #connection-save { background:#356e62; }
         #connection-feedback { color:#e5c07b; min-height:20px; }
+        .settings-tabs { display:flex; gap:6px; margin:16px 0; border-bottom:1px solid #3c4450; padding-bottom:10px; }
+        .settings-tabs button { flex:1; padding:9px; background:#2b323d; border:1px solid transparent; border-radius:6px; color:#bbc4d1; cursor:pointer; }
+        .settings-tabs button[aria-selected="true"] { background:#345c57; color:white; border-color:#65978d; }
+        .settings-card { padding:12px 14px; background:#282f39; border-radius:8px; margin:10px 0; }
+        #connection-form .toggle { display:flex; align-items:center; gap:10px; margin:4px 0; }
+        #connection-form .toggle input { width:18px; height:18px; margin:0; accent-color:#6db8a6; flex:none; }
+        #connection-form select { width:100%; padding:10px; margin-top:6px; background:#171c23; border:1px solid #596273; border-radius:5px; color:#fff; }
+        .settings-caption { color:#9aabba; font-size:12px; margin:0 0 8px; line-height:1.7; }
+        .settings-manual summary { cursor:pointer; padding:10px 0; color:#c1cbd8; }
+        .settings-panel[hidden] { display:none; }
+        .connection-actions { position:sticky; bottom:0; background:#20252d; padding-top:10px; }
     </style>
 </head>
 
 <body>
     <div id="button-bar">
-        <div class="connection-row"><span>接続先: <span id="connection-current"></span></span><button id="settings-button" type="button">接続設定</button></div>
+        <div class="connection-row"><span>接続先: <span id="connection-current"></span></span><button id="settings-button" type="button">設定</button></div>
         <button id="tag-button">選択した画像・動画にAIタグ付けを実行</button>
         <div id="sub-button-row">
             <button id="clear-log-button">ログをクリア</button>
@@ -242,15 +253,39 @@
         </div>
     </div>
     <dialog id="connection-dialog" aria-labelledby="connection-title">
-        <h2 id="connection-title">APIサーバーの接続設定</h2>
+        <h2 id="connection-title">AIタグ付けの設定</h2>
         <form id="connection-form">
+            <nav class="settings-tabs" role="tablist" aria-label="設定カテゴリ">
+                <button type="button" id="tab-connection" data-settings-tab="connection" role="tab" aria-selected="true" aria-controls="panel-connection">接続</button>
+                <button type="button" id="tab-processing" data-settings-tab="processing" role="tab" aria-selected="false" aria-controls="panel-processing">処理</button>
+                <button type="button" id="tab-repair" data-settings-tab="repair" role="tab" aria-selected="false" aria-controls="panel-repair">修復</button>
+            </nav>
+            <section class="settings-panel" id="panel-connection" data-settings-panel="connection" role="tabpanel" aria-labelledby="tab-connection">
+                <div class="settings-card">
+                    <label class="toggle"><input id="connection-auto-colab" type="checkbox">Colabへ自動接続</label>
+                    <p class="connection-help">起動・復旧とURL／トークンの更新を自動で行います。通常は手入力不要です。</p>
+                </div>
+                <details class="settings-manual"><summary>手動接続・LANサーバー</summary>
             <label>接続先URL・IPアドレス<input id="connection-host" type="text" required maxlength="512" placeholder="例: https://example.trycloudflare.com" autocomplete="off" spellcheck="false"></label>
             <label>ポート番号<input id="connection-port" type="number" required min="1" max="65535" step="1" inputmode="numeric"></label>
             <label>APIトークン（Colab用）<input id="connection-token" type="password" maxlength="512" autocomplete="off" spellcheck="false" placeholder="LAN接続で認証なしの場合は空欄"></label>
-            <label><input id="connection-auto-colab" type="checkbox" style="display:inline;width:auto"> Colabの起動と接続先更新を自動で行う</label>
-            <label><input id="repair-mojibake" type="checkbox" style="display:inline;width:auto"> 文字化けタグ修復モード</label>
+                <p class="connection-help">LAN接続ではColab自動接続をオフにしてください。</p>
+                </details>
+            </section>
+            <section class="settings-panel" id="panel-processing" data-settings-panel="processing" role="tabpanel" aria-labelledby="tab-processing" hidden>
+                <label>ColabのGPU<select id="processing-gpu"><option value="T4">T4 — 計算枠を長く使う</option><option value="L4">L4 — 処理速度を優先</option></select></label>
+                <p class="settings-caption">自動接続時に適用します。変更は次回実行から反映。T4は約1.07、L4は約1.54ユニット／時（検証時）。起動中は計算枠を消費します。</p>
+                <div class="settings-card">
+                    <label class="toggle"><input id="processing-batch" type="checkbox">画像をまとめて送信する</label>
+                    <label>一度に送る枚数<select id="processing-batch-size"><option value="4">4枚（おすすめ）</option><option value="8">8枚</option><option value="12">12枚</option></select></label>
+                    <p class="connection-help">画像は1枚ずつ推論し、通信の待ち時間を減らします。動画は個別に処理します。</p>
+                </div>
+            </section>
+            <section class="settings-panel" id="panel-repair" data-settings-panel="repair" role="tabpanel" aria-labelledby="tab-repair" hidden>
+                <div class="settings-card"><label class="toggle"><input id="repair-mojibake" type="checkbox">文字化けタグ修復モード</label>
             <p class="connection-help">選択した画像のうち「�」を含むタグがあるものだけ再タグ付けします。成功した画像からだけ文字化けタグを削除し、正常な既存タグは残します。修復前のタグはバックアップします。</p>
-            <p class="connection-help">ColabのURLとトークンは接続JSONから自動で読み込みます。通常は貼り付け不要です。自動接続が有効な場合、タグ付け前にColabを確認し、必要ならT4を起動します。初回準備には数分かかります。起動中は計算枠を消費します。LAN接続では自動接続をオフにしてください。</p>
+                </div><p class="settings-caption">修復が終わったらオフにすると、通常のタグ付けに戻ります。</p>
+            </section>
             <p id="connection-feedback" role="status"></p>
             <div class="connection-actions"><button id="connection-reset" type="button">初期値に戻す</button><button id="connection-close" type="button">キャンセル</button><button id="connection-save" type="submit">保存</button></div>
         </form>
