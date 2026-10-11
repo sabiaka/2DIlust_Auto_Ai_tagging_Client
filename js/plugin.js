@@ -226,10 +226,15 @@ async function runAiTagging() {
                         headers: { ...form.getHeaders(), ...(destination.token ? { Authorization: 'Bearer ' + destination.token } : {}) },
                         timeout: timeout, // タイムアウト設定
                     }, (response) => {
-                        let responseData = '';
-                        response.on('data', (chunk) => { responseData += chunk; });
+                        const responseChunks = [];
+                        response.on('data', chunk => {
+                            responseChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk, 'utf8'));
+                        });
                         response.on('end', () => {
                             try {
+                                // A UTF-8 character may span several network chunks.
+                                // Decode only after assembling the complete byte stream.
+                                const responseData = Buffer.concat(responseChunks).toString('utf8');
                                 if (response.statusCode < 200 || response.statusCode >= 300) {
                                     const error = new Error(response.statusCode === 530
                                         ? 'HTTP 530: 接続先のColab APIが停止している可能性があります。再起動後のURLとトークンを設定してください。'

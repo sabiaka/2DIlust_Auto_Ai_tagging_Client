@@ -6,8 +6,10 @@ const { EventEmitter } = require('node:events');
 const settings = require('../js/connection-settings');
 const source = fs.readFileSync(path.join(__dirname, '../js/plugin.js'), 'utf8');
 
-async function run(config, expectedTransport, failure = null, automatic = false) {
+async function run(config, expectedTransport, failure = null, automatic = false, fragmented = false) {
     let captured, saved = false;
+    let savedTags;
+    const expectedTags = fragmented ? ['ウマ娘 プリティーダービー', 'ウサギ耳ヘアバンド', '桜羽エマ', '笑顔😊'] : ['タグ'];
     let ensured = false;
     const logs = [];
     const request = transport => ({
@@ -27,7 +29,12 @@ async function run(config, expectedTransport, failure = null, automatic = false)
             queueMicrotask(() => {
                 const response = new EventEmitter(); response.statusCode = failure === 'proxy' ? 530 : failure === 'http' ? 401 : 200;
                 req.callback(response);
-                response.emit('data', failure === 'proxy' ? '<html>Origin unavailable</html>' : JSON.stringify(failure === 'http' ? {detail:'Unauthorized'} : {tags:['タグ']})); response.emit('end');
+                const body = failure === 'proxy' ? '<html>Origin unavailable</html>' : JSON.stringify(failure === 'http' ? {detail:'Unauthorized'} : {tags:expectedTags});
+                if (fragmented) {
+                    const bytes = Buffer.from(body,'utf8');
+                    for (let i=0;i<bytes.length;i++) response.emit('data',bytes.subarray(i,i+1));
+                } else response.emit('data',body);
+                response.emit('end');
             });
         }
     }
@@ -49,7 +56,7 @@ async function run(config, expectedTransport, failure = null, automatic = false)
         },
         window:{aiTaggerConnectionSettings:settings,addEventListener(){},appendToLog(message){logs.push(message);}},
         document, localStorage:{getItem:() => JSON.stringify(config)}, log(){},
-        eagle:{item:{getSelected:async () => [{name:'test.png',ext:'png',filePath:'test.png',tags:[],save:async () => {saved=true;}}]}},
+        eagle:{item:{getSelected:async () => [{name:'test.png',ext:'png',filePath:'test.png',tags:[],save:async function () {saved=true;savedTags=Array.from(this.tags);}}]}},
         console:{log(){}},setTimeout,Buffer,__dirname:path.join(__dirname,'..'),
     });
     vm.runInContext(source,context);
@@ -68,6 +75,7 @@ async function run(config, expectedTransport, failure = null, automatic = false)
     assert.equal(captured.headers['content-type'],'multipart/form-data; boundary=test');
     assert.equal(captured.headers.Authorization,config.token ? 'Bearer '+config.token : undefined);
     assert.equal(saved,!failure);
+    if (!failure) assert.deepEqual(savedTags,expectedTags,'UTF-8 tags must survive arbitrary network chunk boundaries');
     if (failure === 'http') assert.ok(logs.some(message => message.includes('HTTPエラー: 401')));
     if (failure === 'proxy') assert.ok(logs.some(message => message.includes('HTTP 530') && message.includes('Colab')));
 }
@@ -78,6 +86,8 @@ async function run(config, expectedTransport, failure = null, automatic = false)
     await run({host:'127.0.0.1',port:8000},'http','file');
     await run({host:'example.trycloudflare.com',port:443,protocol:'https:',token:'test-token'},'https','proxy');
     await run({host:'new.trycloudflare.com',port:443,protocol:'https:',token:'new-token'},'https',null,true);
+    await run({host:'example.trycloudflare.com',port:443,protocol:'https:',token:'test-token'},'https',null,false,true);
+    await run({host:'127.0.0.1',port:8000},'http',null,false,true);
     console.log('Client job selects HTTPS + bearer token; legacy HTTP still saves returned tags.');
 })().catch(error => { console.error(error); process.exitCode=1; });
 
