@@ -139,8 +139,7 @@ async function runAiTagging() {
             if (cancelTagging) return;
         }
         let destination = { ...apiSettings };
-        const retriedItems = new Set();
-        let recoveryCount = 0;
+        const itemRecoveryCounts = new Map();
         // 動画ファイルの数をカウント
         const videoCount = items.filter(item => {
             const ext = item.ext.toLowerCase();
@@ -356,12 +355,15 @@ async function runAiTagging() {
                     || ['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EPIPE'].includes(err.code);
                 if (unavailable) {
                     if (cancelTagging) break;
-                    if (!colabManager.enabled() || retriedItems.has(i) || recoveryCount >= 3) {
-                        throw new Error(`[${item.name}] 接続障害のため後続の送信を停止しました: ${err.message}`);
+                    if (!colabManager.enabled()) {
+                        throw new Error(`[${item.name}] Colab自動復旧がオフのため停止しました: ${err.message}`);
                     }
-                    retriedItems.add(i);
-                    recoveryCount++;
-                    log(`[${item.name}] 接続障害を検出しました。後続の送信を止めてColabを復旧します。`, 'warn');
+                    const attempts = itemRecoveryCounts.get(i) || 0;
+                    if (attempts >= 3) {
+                        throw new Error(`[${item.name}] 同じ画像でColabを3回復旧して再試行しましたが、接続障害が続くため停止しました: ${err.message}`);
+                    }
+                    itemRecoveryCounts.set(i, attempts + 1);
+                    log(`[${item.name}] 接続障害を検出しました。後続の送信を止めてColabを復旧します（この画像で ${attempts + 1}/3 回目）。`, 'warn');
                     // Recovery failures escape the item loop and stop the whole job.
                     apiSettings = await colabManager.ensure({ forceRestart: [502, 503, 504, 521, 522, 523, 524, 530].includes(err.statusCode) });
                     destination = { ...apiSettings };
