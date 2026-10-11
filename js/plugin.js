@@ -15,6 +15,9 @@ const colabManager = require(path.join(__dirname, 'js', 'colab-manager.js')).cre
     settings: connectionSettings, onProgress: message => log(message, 'info'),
 });
 const API_PATH = '/tag';
+const REPAIR_MODE_KEY = 'ai-tagger.repair-mojibake.v1';
+function repairModeEnabled() { return localStorage.getItem(REPAIR_MODE_KEY) === 'true'; }
+function hasBrokenTags(item) { return (item.tags || []).some(tag => typeof tag === 'string' && tag.includes('\uFFFD')); }
 
 function refreshConnectionFromJson() {
     // Respect a manually selected LAN server. Existing Colab connections also
@@ -46,7 +49,7 @@ function updateTagButton(running) {
         tagButton.textContent = 'タグ付け中止';
         tagButton.classList.add('tagging');
     } else {
-        tagButton.textContent = '選択した画像・動画にAIタグ付けを実行';
+        tagButton.textContent = repairModeEnabled() ? '選択した画像の文字化けタグを修復' : '選択した画像・動画にAIタグ付けを実行';
         tagButton.classList.remove('tagging');
     }
 }
@@ -60,6 +63,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const tokenInput = document.getElementById('connection-token');
     const feedback = document.getElementById('connection-feedback');
     const autoColab = document.getElementById('connection-auto-colab');
+    const repairInput = document.getElementById('repair-mojibake');
     function showConnection() {
         document.getElementById('connection-current').textContent = connectionSettings.format(apiSettings);
     }
@@ -71,6 +75,7 @@ window.addEventListener('DOMContentLoaded', () => {
         tokenInput.value = apiSettings.token;
         autoColab.checked = colabManager.enabled();
         autoColab.disabled = !colabManager.available();
+        repairInput.checked = repairModeEnabled();
         feedback.textContent = '';
         dialog.showModal();
     });
@@ -80,6 +85,8 @@ window.addEventListener('DOMContentLoaded', () => {
         try {
             apiSettings = connectionSettings.save(localStorage, hostInput.value, portInput.value, tokenInput.value);
             colabManager.setEnabled(autoColab.checked);
+            localStorage.setItem(REPAIR_MODE_KEY, String(repairInput.checked));
+            updateTagButton(isTagging);
             showConnection();
             dialog.close();
             log('接続先を保存しました: ' + connectionSettings.format(apiSettings), 'info');
@@ -113,14 +120,19 @@ async function runAiTagging() {
     isTagging = true;
     cancelTagging = false;
     updateTagButton(true);
+    const repairMode = repairModeEnabled();
+    let backupPath = null;
     // Keep one destination for the whole job; edits apply to the next run.
     try {
         refreshConnectionFromJson();
-        const items = await eagle.item.getSelected();
+        const selectedItems = await eagle.item.getSelected();
+        const items = repairMode ? selectedItems.filter(item => hasBrokenTags(item)
+            && ['jpg','jpeg','jfif','png','gif','bmp','webp','psd'].includes(item.ext.toLowerCase())) : selectedItems;
         if (items.length === 0) {
-            log('画像・動画をせんたーく！してね！', 'warn');
+            log(repairMode ? '選択した画像に修復対象の文字化けタグはありません。' : '画像・動画をせんたーく！してね！', 'warn');
             return;
         }
+        if (repairMode) log(`文字化けタグ修復: 対象 ${items.length} 件（対象外 ${selectedItems.length - items.length} 件）。正常な既存タグは残します。`, 'info');
         if (colabManager.enabled()) {
             apiSettings = await colabManager.ensure();
             document.getElementById('connection-current').textContent = connectionSettings.format(apiSettings);
@@ -249,6 +261,12 @@ async function runAiTagging() {
                                     return;
                                 }
                                 const jsonResponse = JSON.parse(responseData);
+                                if (!Array.isArray(jsonResponse.tags) || !jsonResponse.tags.every(tag => typeof tag === 'string')) {
+                                    throw new Error('APIのタグ形式が不正です。既存タグは変更しません。');
+                                }
+                                if (repairMode && (!jsonResponse.tags.length || jsonResponse.tags.some(tag => tag.includes('\uFFFD')))) {
+                                    throw new Error('修復に使える正常なタグが返りませんでした。既存タグは変更しません。');
+                                }
                                 if (response.statusCode >= 200 && response.statusCode < 300) {
                                     resolve(jsonResponse.tags);
                                 } else {
@@ -276,9 +294,21 @@ async function runAiTagging() {
 
                 // タグ付け処理
                 if (tags && tags.length > 0) {
-                    const newTags = [...new Set([...item.tags, ...tags])];
+                    const originalTags = [...item.tags];
+                    if (repairMode) {
+                        if (!backupPath) {
+                            const folder = path.join(require('os').homedir(), 'AppData', 'Roaming', 'Eagle', 'ai-tagger-repair-backups');
+                            fs.mkdirSync(folder, {recursive:true});
+                            backupPath = path.join(folder, `tags-${Date.now()}-${require('crypto').randomBytes(6).toString('hex')}.jsonl`);
+                        }
+                        fs.appendFileSync(backupPath, JSON.stringify({id:item.id, name:item.name, filePath:item.filePath, tags:originalTags, repairedAt:new Date().toISOString()}) + '\n', 'utf8');
+                    }
+                    const existingTags = repairMode ? originalTags.filter(tag => !tag.includes('\uFFFD')) : originalTags;
+                    const newTags = [...new Set([...existingTags, ...tags])];
                     item.tags = newTags;
-                    await item.save();
+                    try { await item.save(); }
+                    catch (error) { item.tags = originalTags; throw error; }
+                    if (repairMode) log(`[${item.name}] 文字化けタグ ${originalTags.length - existingTags.length} 件を削除し、正常なタグで修復しました。`, 'success');
                     const isVideo = ['mp4', 'mov', 'avi', 'wmv', 'mpeg', 'mpg'].includes(ext);
                     if (isVideo) {
                         log(`[${item.name}] にタグ [${tags.join(', ')}] を追加したお！🎉 (動画ファイル)`, 'success', item.filePath);
